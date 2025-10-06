@@ -1,0 +1,547 @@
+openapi: 3.0.3
+info:
+  title: GitHub MCP Server API
+  description: MCP-compatible API for fetching templates and flows from GitHub repositories
+  version: 1.0.0
+  contact:
+    name: FlowyPrompt Team
+
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+  - url: https://mcp.flowyprompt.com
+    description: Production server
+
+security:
+  - BearerAuth: []
+
+paths:
+  /fetch:
+    post:
+      summary: Fetch template or flow from GitHub
+      description: |
+        Fetches a JSON-based template or flow definition from the configured GitHub repository.
+        Supports caching via ETag headers and schema validation before returning data.
+      operationId: fetchResource
+      tags:
+        - Resources
+      security:
+        - BearerAuth: []
+        - {} # Optional auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FetchRequest'
+            examples:
+              fetchTemplate:
+                summary: Fetch a template
+                value:
+                  type: template
+                  name: Brand_Positioning_Strategy
+                  validate: true
+              fetchFlow:
+                summary: Fetch a flow
+                value:
+                  type: flow
+                  name: Flow1
+                  ref: v1.0.0
+      responses:
+        '200':
+          description: Resource fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              examples:
+                templateSuccess:
+                  summary: Template fetch success
+                  value:
+                    status: success
+                    data:
+                      type: template
+                      name: Brand_Positioning_Strategy
+                      ref: main
+                      content:
+                        metadata:
+                          name: Brand Positioning Strategy
+                          description: Generate comprehensive brand positioning
+                          version: 1.0.0
+                        variables:
+                          - name: brand_name
+                            type: string
+                            required: true
+                        results:
+                          - section: positioning_statement
+                            content: "..."
+                            format: markdown
+                      cached: false
+                      etag: W/"abc123"
+                    metadata:
+                      fetchedAt: 1696502400000
+                      latencyMs: 342
+                      source: github
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidType:
+                  summary: Invalid resource type
+                  value:
+                    status: error
+                    error:
+                      code: INVALID_REQUEST
+                      message: "Invalid type: must be 'template' or 'flow'"
+                      source: request
+        '401':
+          description: Unauthorized (invalid or missing auth token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: GitHub PAT authentication failed
+                  value:
+                    status: error
+                    error:
+                      code: UNAUTHORIZED
+                      message: GitHub authentication failed
+                      source: github
+        '404':
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notFound:
+                  summary: Template not found
+                  value:
+                    status: error
+                    error:
+                      code: NOT_FOUND
+                      message: "Template 'InvalidName' not found"
+                      source: github
+        '413':
+          description: Resource too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                tooLarge:
+                  summary: File exceeds size limit
+                  value:
+                    status: error
+                    error:
+                      code: FILE_TOO_LARGE
+                      message: Template exceeds 10MB limit
+                      source: github
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                validationError:
+                  summary: Schema validation failed
+                  value:
+                    status: error
+                    error:
+                      code: VALIDATION_ERROR
+                      message: "Invalid template schema: missing required field 'metadata'"
+                      source: validation
+                      details:
+                        schemaErrors:
+                          - path: .metadata
+                            message: must have required property 'metadata'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                rateLimited:
+                  summary: GitHub rate limit exceeded
+                  value:
+                    status: error
+                    error:
+                      code: RATE_LIMITED
+                      message: "GitHub API rate limit exceeded, retry after 2025-10-05T13:00:00Z"
+                      source: github
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                internalError:
+                  summary: Unexpected server error
+                  value:
+                    status: error
+                    error:
+                      code: INTERNAL_ERROR
+                      message: An unexpected error occurred
+                      source: server
+
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns server health status and basic metrics
+      operationId: getHealth
+      tags:
+        - System
+      security: []
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, degraded]
+                  uptime:
+                    type: number
+                    description: Server uptime in seconds
+                  github:
+                    type: object
+                    properties:
+                      connected:
+                        type: boolean
+                      rateLimitRemaining:
+                        type: integer
+                example:
+                  status: healthy
+                  uptime: 3600
+                  github:
+                    connected: true
+                    rateLimitRemaining: 4987
+
+  /metrics:
+    get:
+      summary: Get operational metrics
+      description: Returns comprehensive metrics for monitoring and observability
+      operationId: getMetrics
+      tags:
+        - System
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Metrics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Metrics'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Optional JWT authentication token
+
+  schemas:
+    FetchRequest:
+      type: object
+      required:
+        - type
+        - name
+      properties:
+        type:
+          type: string
+          enum: [template, flow]
+          description: Resource type to fetch
+        name:
+          type: string
+          pattern: '^[a-zA-Z0-9_-]+$'
+          minLength: 1
+          maxLength: 255
+          description: Resource identifier (alphanumeric, underscore, hyphen)
+        ref:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Optional Git reference (branch/tag/commit SHA)
+          example: main
+        validate:
+          type: boolean
+          default: true
+          description: Force schema validation (defaults to true)
+
+    SuccessResponse:
+      type: object
+      required:
+        - status
+        - data
+        - metadata
+      properties:
+        status:
+          type: string
+          enum: [success]
+        data:
+          type: object
+          required:
+            - type
+            - name
+            - ref
+            - content
+            - cached
+          properties:
+            type:
+              type: string
+              enum: [template, flow]
+            name:
+              type: string
+            ref:
+              type: string
+            content:
+              oneOf:
+                - $ref: '#/components/schemas/Template'
+                - $ref: '#/components/schemas/Flow'
+            cached:
+              type: boolean
+              description: True if served from cache
+            etag:
+              type: string
+              description: Current ETag for client-side caching
+        metadata:
+          type: object
+          required:
+            - fetchedAt
+            - latencyMs
+            - source
+          properties:
+            fetchedAt:
+              type: integer
+              description: Unix timestamp (milliseconds)
+            latencyMs:
+              type: number
+              description: Request processing time
+            source:
+              type: string
+              enum: [cache, github]
+
+    ErrorResponse:
+      type: object
+      required:
+        - status
+        - error
+      properties:
+        status:
+          type: string
+          enum: [error]
+        error:
+          type: object
+          required:
+            - code
+            - message
+            - source
+          properties:
+            code:
+              type: string
+              enum:
+                - INVALID_REQUEST
+                - NOT_FOUND
+                - VALIDATION_ERROR
+                - FILE_TOO_LARGE
+                - INVALID_CONFIG
+                - GITHUB_ERROR
+                - NETWORK_ERROR
+                - PARSE_ERROR
+                - RATE_LIMITED
+                - UNAUTHORIZED
+                - INTERNAL_ERROR
+            message:
+              type: string
+              description: Human-readable error description
+            source:
+              type: string
+              enum: [request, github, validation, cache, config, server]
+            details:
+              type: object
+              description: Additional context (no sensitive data)
+
+    Template:
+      type: object
+      required:
+        - metadata
+        - variables
+        - results
+      properties:
+        metadata:
+          type: object
+          required:
+            - name
+            - description
+            - version
+          properties:
+            name:
+              type: string
+            description:
+              type: string
+            version:
+              type: string
+              pattern: '^\d+\.\d+\.\d+$'
+            author:
+              type: string
+            tags:
+              type: array
+              items:
+                type: string
+        variables:
+          type: array
+          items:
+            type: object
+            required:
+              - name
+              - type
+            properties:
+              name:
+                type: string
+              type:
+                type: string
+                enum: [string, number, boolean, array, object]
+              default: {}
+              description:
+                type: string
+              required:
+                type: boolean
+        results:
+          type: array
+          items:
+            type: object
+            required:
+              - section
+              - content
+            properties:
+              section:
+                type: string
+              content:
+                type: string
+              format:
+                type: string
+                enum: [text, markdown, json]
+
+    Flow:
+      type: object
+      required:
+        - metadata
+        - nodes
+        - edges
+      properties:
+        metadata:
+          type: object
+          required:
+            - name
+            - version
+          properties:
+            name:
+              type: string
+            description:
+              type: string
+            version:
+              type: string
+              pattern: '^\d+\.\d+\.\d+$'
+        nodes:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+              - id
+              - type
+            properties:
+              id:
+                type: string
+              type:
+                type: string
+                enum: [input, template, result, flow-link]
+              label:
+                type: string
+              config:
+                type: object
+        edges:
+          type: array
+          items:
+            type: object
+            required:
+              - source
+              - target
+            properties:
+              source:
+                type: string
+              target:
+                type: string
+              condition:
+                type: string
+
+    Metrics:
+      type: object
+      properties:
+        requests:
+          type: object
+          properties:
+            total:
+              type: integer
+            successful:
+              type: integer
+            failed:
+              type: integer
+        cache:
+          type: object
+          properties:
+            hits:
+              type: integer
+            misses:
+              type: integer
+            evictions:
+              type: integer
+            hitRate:
+              type: number
+              description: Cache hit rate (0-1)
+        github:
+          type: object
+          properties:
+            requests:
+              type: integer
+            errors:
+              type: integer
+            notModified:
+              type: integer
+              description: 304 responses (ETag matches)
+            rateLimitRemaining:
+              type: integer
+            rateLimitReset:
+              type: integer
+              description: Unix timestamp
+        performance:
+          type: object
+          properties:
+            averageLatencyMs:
+              type: number
+            p95LatencyMs:
+              type: number
+            p99LatencyMs:
+              type: number
+        validation:
+          type: object
+          properties:
+            errors:
+              type: integer
+            schemaViolations:
+              type: object
+              additionalProperties:
+                type: integer

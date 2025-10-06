@@ -1,0 +1,279 @@
+{
+  "tool": "prompts/get",
+  "description": "Get a specific template, extract variables, and generate a prompt with provided values",
+  "version": "1.0.0",
+  "input": {
+    "description": "Template name and variable values for substitution",
+    "schema": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "description": "Template identifier (without .json extension)",
+          "example": "Brand_Positioning_Strategy"
+        },
+        "arguments": {
+          "type": "object",
+          "description": "Variable values as key-value pairs (all values must be strings)",
+          "patternProperties": {
+            "^[a-zA-Z0-9_]+$": {
+              "type": "string",
+              "maxLength": 10000,
+              "description": "Variable value (string only)"
+            }
+          },
+          "additionalProperties": false,
+          "example": {
+            "company_name": "테크스타트업",
+            "industry": "AI",
+            "target_audience": "B2B SaaS 기업"
+          }
+        }
+      }
+    }
+  },
+  "output": {
+    "description": "Generated prompt with variables substituted",
+    "schema": {
+      "type": "object",
+      "required": ["messages"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Template description (from metadata)",
+          "example": "브랜드 포지셔닝 전략 수립"
+        },
+        "messages": {
+          "type": "array",
+          "description": "MCP message array with generated prompt",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["role", "content"],
+            "properties": {
+              "role": {
+                "type": "string",
+                "enum": ["user"],
+                "description": "Message role (always 'user' for prompts)"
+              },
+              "content": {
+                "type": "object",
+                "required": ["type", "text"],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["text"],
+                    "description": "Content type (always 'text')"
+                  },
+                  "text": {
+                    "type": "string",
+                    "description": "Fully generated prompt with variables substituted",
+                    "example": "# 브랜드 포지셔닝 전략\n\n**Version**: 1.0.0\n\n---\n\n회사명: 테크스타트업\n산업: AI\n타겟 고객: B2B SaaS 기업\n\n..."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "errors": [
+    {
+      "code": "TEMPLATE_NOT_FOUND",
+      "message": "Template '{name}' not found in repository",
+      "httpEquivalent": 404,
+      "userAction": "Check template name spelling or use prompts/list to see available templates"
+    },
+    {
+      "code": "MISSING_REQUIRED_VARIABLE",
+      "message": "Required variable '{name}' not provided",
+      "httpEquivalent": 400,
+      "userAction": "Provide value for all required variables in arguments object"
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "message": "Template schema validation failed: {details}",
+      "httpEquivalent": 422,
+      "userAction": "Template file is corrupted or invalid - contact repository maintainer"
+    },
+    {
+      "code": "TEMPLATE_TOO_LARGE",
+      "message": "Template file exceeds maximum size of 100KB",
+      "httpEquivalent": 413,
+      "userAction": "Template is too large - split into smaller templates"
+    },
+    {
+      "code": "GITHUB_AUTH_FAILED",
+      "message": "GitHub authentication failed",
+      "httpEquivalent": 401,
+      "userAction": "Verify GITHUB_PAT environment variable"
+    },
+    {
+      "code": "INVALID_VARIABLE_TYPE",
+      "message": "Variable '{name}' must be a string",
+      "httpEquivalent": 400,
+      "userAction": "All variable values must be strings (no numbers, booleans, arrays, or objects)"
+    }
+  ],
+  "examples": [
+    {
+      "scenario": "Successful prompt generation with all required variables",
+      "request": {
+        "name": "Brand_Positioning_Strategy",
+        "arguments": {
+          "company_name": "테크스타트업",
+          "industry": "AI",
+          "target_audience": "B2B SaaS 기업"
+        }
+      },
+      "response": {
+        "description": "브랜드 포지셔닝 전략 수립",
+        "messages": [
+          {
+            "role": "user",
+            "content": {
+              "type": "text",
+              "text": "# 브랜드 포지셔닝 전략\n\n브랜드 포지셔닝 전략 수립\n\n**Version**: 1.0.0\n**Tags**: marketing, strategy, branding\n\n---\n\n## 회사 정보\n- 회사명: 테크스타트업\n- 산업 분야: AI\n- 타겟 고객: B2B SaaS 기업\n\n---\n\n## 분석 요청사항\n위 정보를 바탕으로 다음을 분석해주세요:\n1. 경쟁 우위 요소\n2. 포지셔닝 전략\n3. 메시징 프레임워크"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "Missing required variable",
+      "request": {
+        "name": "Brand_Positioning_Strategy",
+        "arguments": {
+          "company_name": "테크스타트업"
+        }
+      },
+      "error": {
+        "code": "MISSING_REQUIRED_VARIABLE",
+        "message": "Required variable 'industry' not provided"
+      }
+    },
+    {
+      "scenario": "Optional variable omitted (uses default or empty)",
+      "request": {
+        "name": "Brand_Positioning_Strategy",
+        "arguments": {
+          "company_name": "테크스타트업",
+          "industry": "AI"
+        }
+      },
+      "response": {
+        "description": "브랜드 포지셔닝 전략 수립",
+        "messages": [
+          {
+            "role": "user",
+            "content": {
+              "type": "text",
+              "text": "# 브랜드 포지셔닝 전략\n\n...\n- 타겟 고객: \n\n..."
+            }
+          }
+        ]
+      },
+      "note": "target_audience is optional, so empty string is used"
+    },
+    {
+      "scenario": "Template not found",
+      "request": {
+        "name": "Nonexistent_Template"
+      },
+      "error": {
+        "code": "TEMPLATE_NOT_FOUND",
+        "message": "Template 'Nonexistent_Template' not found in repository"
+      }
+    },
+    {
+      "scenario": "Invalid variable type (number instead of string)",
+      "request": {
+        "name": "Brand_Positioning_Strategy",
+        "arguments": {
+          "company_name": 123,
+          "industry": "AI"
+        }
+      },
+      "error": {
+        "code": "INVALID_VARIABLE_TYPE",
+        "message": "Variable 'company_name' must be a string"
+      }
+    }
+  ],
+  "performance": {
+    "promptGeneration": {
+      "target": "< 100ms",
+      "description": "Time to substitute variables and format prompt"
+    },
+    "totalLatency": {
+      "cold": "≤ 2s (GitHub fetch + generation)",
+      "cached": "≤ 300ms (cache hit + generation)"
+    }
+  },
+  "testCases": [
+    {
+      "id": "TC-GET-001",
+      "description": "Should generate prompt with all variables substituted",
+      "given": "Template exists with {{company_name}}, {{industry}} variables",
+      "when": "prompts/get is called with matching arguments",
+      "then": "Returns prompt with placeholders replaced by argument values"
+    },
+    {
+      "id": "TC-GET-002",
+      "description": "Should error on missing required variable",
+      "given": "Template has required variable 'industry'",
+      "when": "prompts/get is called without 'industry' in arguments",
+      "then": "Returns MISSING_REQUIRED_VARIABLE error"
+    },
+    {
+      "id": "TC-GET-003",
+      "description": "Should handle optional variables gracefully",
+      "given": "Template has optional variable 'target_audience'",
+      "when": "prompts/get is called without 'target_audience' in arguments",
+      "then": "Uses default value or empty string, no error"
+    },
+    {
+      "id": "TC-GET-004",
+      "description": "Should validate template JSON schema",
+      "given": "Template file is invalid JSON or missing required fields",
+      "when": "prompts/get is called",
+      "then": "Returns VALIDATION_ERROR with details"
+    },
+    {
+      "id": "TC-GET-005",
+      "description": "Should enforce string-only variable types",
+      "given": "User provides number, boolean, or object as variable value",
+      "when": "prompts/get is called",
+      "then": "Returns INVALID_VARIABLE_TYPE error"
+    },
+    {
+      "id": "TC-GET-006",
+      "description": "Should format prompt with metadata header",
+      "given": "Template has metadata.name, description, version, tags",
+      "when": "prompts/get is called",
+      "then": "Prompt starts with markdown header containing metadata"
+    },
+    {
+      "id": "TC-GET-007",
+      "description": "Should handle templates with no variables",
+      "given": "Template has empty variables array",
+      "when": "prompts/get is called with no arguments",
+      "then": "Returns prompt with results sections (no substitution)"
+    },
+    {
+      "id": "TC-GET-008",
+      "description": "Should use cache for repeated requests",
+      "given": "Same template requested twice within cache TTL",
+      "when": "prompts/get is called second time",
+      "then": "Uses cached template, total latency < 300ms"
+    }
+  ],
+  "variableHandling": {
+    "extractionPattern": "{{[a-zA-Z0-9_]+}}",
+    "mismatchStrategy": "WARNING",
+    "description": "If template defines variable not used in content, or content uses undefined variable, log warning but continue execution"
+  }
+}
