@@ -8,7 +8,7 @@ Model Context Protocol (MCP) server for Claude Desktop integration, providing pr
 ## 🎯 Features
 
 - **🤖 Claude Desktop Integration**: Native MCP protocol support via stdio transport
-- **📝 Automatic Variable Extraction**: Detects `{{variable}}` placeholders in templates
+- **📝 Automatic Variable Extraction**: Detects `{variable}` placeholders in templates (FlowyPrompt format)
 - **🔄 Smart Caching**: 15-minute TTL with ETag revalidation from GitHub
 - **⚡ High Performance**: <100ms prompt generation, <300ms cached fetches
 - **🔐 Secure**: GitHub PAT authentication, input validation, no exposed ports
@@ -161,16 +161,16 @@ Tool: prompts/get
 **Returns**:
 ```json
 {
-  "description": "Develop comprehensive brand positioning strategy",
-  "messages": [
-    {
-      "role": "user",
-      "content": {
-        "type": "text",
-        "text": "# Brand Positioning Strategy\n\nDevelop a comprehensive brand positioning strategy for Acme Corp in the Technology industry...\n"
-      }
-    }
-  ]
+  "description": "Develop Solution Template",
+  "content": "develop a template for Acme Corp targeting Technology with Strict requirements.",
+  "arguments": [
+    {"name": "_variableSet", "description": "Select a pre-filled variable set", "required": false},
+    {"name": "_useSet_var1", "description": "Use \"var1\" (enter X to use): target=q, audience=w, requirements=d", "required": false},
+    {"name": "target", "description": "Value for target", "required": false},
+    {"name": "audience", "description": "Value for audience", "required": false},
+    {"name": "requirements", "description": "Value for requirements", "required": false}
+  ],
+  "isError": false
 }
 ```
 
@@ -314,52 +314,52 @@ Tool: get_variable_sets
 
 ## 🏗️ Template Format
 
-Templates are JSON files stored in the `templates/` folder of your GitHub repository.
+Templates are JSON files stored under `templates/` in your GitHub repository, named as `templates/<Template_Name>.json`.
 
-**Example Template**: `templates/Brand_Positioning_Strategy.json`
+This server supports the FlowyPrompt export structure. At minimum, place a top-level object with a `templates` array and store your prompt in the first element using `{variable}` placeholders and optional `variableValueSets`.
+
+**Example Template**: `templates/Develop_Solution_Template.json`
 
 ```json
 {
   "metadata": {
-    "name": "Brand Positioning Strategy",
-    "description": "Develop comprehensive brand positioning strategy",
-    "version": "1.0.0",
-    "tags": ["marketing", "strategy", "branding"]
+    "version": "2.0",
+    "exportDate": "2025-10-06T06:21:00.659Z",
+    "templateCount": 1,
+    "includeImages": false,
+    "imageCount": 0,
+    "fileName": "Develop_Solution_Template.json",
+    "source": "FlowyPrompt Web App"
   },
-  "variables": [
+  "templates": [
     {
-      "name": "company_name",
-      "description": "Your company name",
-      "required": true
-    },
-    {
-      "name": "industry",
-      "description": "Your industry sector",
-      "required": true
-    },
-    {
-      "name": "target_audience",
-      "description": "Target customer segment",
-      "required": false,
-      "default": "General market"
-    }
-  ],
-  "results": [
-    {
-      "section": "introduction",
-      "content": "Develop a comprehensive brand positioning strategy for {{company_name}} in the {{industry}} industry, targeting {{target_audience}}."
-    },
-    {
-      "section": "analysis",
-      "content": "Analyze the competitive landscape for {{company_name}} within the {{industry}} sector..."
+      "id": "1758694568593",
+      "title": "Develop Solution Template",
+      "template": "develop a template for {target} targeting {audience} with {requirements}.",
+      "variables": ["target", "audience", "requirements"],
+      "createdAt": "2025-09-24T06:16:08.593Z",
+      "updatedAt": "2025-10-06T06:20:26.966Z",
+      "version": 2,
+      "variableValueSets": [
+        {
+          "id": "77eae1c3-67ef-4124-8eb1-02e129709a07",
+          "name": "var1",
+          "description": "",
+          "values": {"target": "q", "audience": "w", "requirements": "d"},
+          "images": [],
+          "result": "",
+          "createdAt": "2025-10-06T06:20:26.962Z",
+          "updatedAt": "2025-10-06T06:20:26.962Z"
+        }
+      ]
     }
   ]
 }
 ```
 
-**Variable Syntax**: Use `{{variable_name}}` for placeholders
-**Validation**: Templates are automatically validated against JSON schema
-**Caching**: Templates are cached for 15 minutes with ETag revalidation
+**Variable Syntax**: Use `{variable}` placeholders
+**Variable Sets**: Select via `_variableSet` or `_useSet_<name>` in tool inputs
+**Caching**: Templates are cached with ETag-based revalidation
 
 ## 🏗️ Architecture
 
