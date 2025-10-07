@@ -5,37 +5,90 @@ import { validateFlow } from '../models/flowSchema.js';
 
 /**
  * Parse and validate flow JSON
- * @param {Object} flowJson - Raw flow JSON object
- * @returns {Object} Validated flow object
+ * @param {Object} flowJson - Raw flow JSON object (flowFile structure from GitHub)
+ * @returns {Object} Validated flow object (single flow)
  * @throws {Error} If validation fails
  */
 function parseFlow(flowJson) {
-  const validation = validateFlowSchema(flowJson);
+  // Log the incoming structure for debugging
+  log.info('Parsing flow structure', {
+    hasMetadata: !!flowJson.metadata,
+    hasFlows: !!(flowJson.flows && Array.isArray(flowJson.flows)),
+    flowsCount: flowJson.flows ? flowJson.flows.length : 0,
+    hasMeta: !!(flowJson.meta && flowJson.nodes && flowJson.edges),
+    keys: Object.keys(flowJson)
+  }, 'parseFlow');
 
-  if (!validation.valid) {
-    const error = new Error('Flow validation failed');
+  // Validate that we have the expected flowFile structure
+  if (!flowJson.metadata || !flowJson.flows || !Array.isArray(flowJson.flows)) {
+    const error = new Error('Invalid flow structure: expected metadata and flows array');
     error.code = 'VALIDATION_ERROR';
-    error.errors = validation.errors;
+    log.error('Flow structure validation failed', {
+      error: error.message,
+      structure: Object.keys(flowJson),
+      hasMetadata: !!flowJson.metadata,
+      hasFlows: !!flowJson.flows
+    }, 'parseFlow');
     throw error;
   }
 
-  // Return the first flow from the flows array
-  if (!flowJson.flows || flowJson.flows.length === 0) {
+  if (flowJson.flows.length === 0) {
     const error = new Error('No flows found in flow file');
     error.code = 'VALIDATION_ERROR';
     throw error;
   }
 
-  return flowJson.flows[0];
+  // Extract the first flow from the flows array
+  const flow = flowJson.flows[0];
+
+  // Validate that the extracted flow has the required structure
+  if (!flow.meta || !flow.nodes || !flow.edges) {
+    const error = new Error('Invalid flow structure: flow must have meta, nodes, and edges');
+    error.code = 'VALIDATION_ERROR';
+    log.error('Flow object validation failed', {
+      error: error.message,
+      flowKeys: Object.keys(flow),
+      hasMeta: !!flow.meta,
+      hasNodes: !!flow.nodes,
+      hasEdges: !!flow.edges
+    }, 'parseFlow');
+    throw error;
+  }
+
+  // Validate the flow structure using our schema
+  const validation = validateFlow(flowJson);
+
+  if (!validation.valid) {
+    const error = new Error(`Flow validation failed: ${validation.errors?.[0]?.message || 'Unknown error'}`);
+    error.code = 'VALIDATION_ERROR';
+    error.errors = validation.errors;
+
+    log.error('Flow schema validation failed', {
+      error: error.message,
+      errors: validation.errors,
+      flowName: flow.meta?.name || 'unknown'
+    }, 'parseFlow');
+
+    throw error;
+  }
+
+  log.info('Flow parsed successfully', {
+    flowName: flow.meta?.name,
+    flowId: flow.meta?.id,
+    nodeCount: flow.nodes?.length || 0,
+    edgeCount: flow.edges?.length || 0
+  }, 'parseFlow');
+
+  return flow;
 }
 
 /**
  * Validate flow against JSON schema
- * @param {Object} flow - Flow object to validate
+ * @param {Object} flowFile - FlowFile object to validate
  * @returns {{ valid: boolean, errors: Array|null }}
  */
-function validateFlowSchema(flow) {
-  return validateFlow(flow);
+function validateFlowSchema(flowFile) {
+  return validateFlow(flowFile);
 }
 
 /**

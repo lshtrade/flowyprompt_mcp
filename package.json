@@ -6,7 +6,13 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node index.js",
+    "start:http": "node index.js --transport=http",
+    "start:stdio": "node index.js --transport=stdio",
     "dev": "node --watch index.js",
+    "dev:http": "node --watch index.js --transport=http",
+    "dev:stdio": "node --watch index.js --transport=stdio",
+    "config:generate": "node -e \"import('./src/utils/configGenerator.js').then(m => m.generateAllConfigs())\"",
+    "config:claude": "npm run config:generate",
     "test": "NODE_ENV=test node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:coverage": "NODE_ENV=test node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
     "test:watch": "NODE_ENV=test node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",

@@ -28,24 +28,80 @@ export default async function flowsExecuteTool(args) {
     const flow = flowResult.content;
 
     // Parse and validate flow
-    flowService.parseFlow(flow);
+    try {
+      // Debug: Log the incoming flow structure
+      log.info('Flow structure received', {
+        flowName,
+        hasMetadata: !!flow.metadata,
+        hasFlows: !!(flow.flows && Array.isArray(flow.flows)),
+        flowsCount: flow.flows ? flow.flows.length : 0,
+        hasMeta: !!flow.meta,
+        hasNodes: !!(flow.nodes && Array.isArray(flow.nodes)),
+        hasEdges: !!(flow.edges && Array.isArray(flow.edges)),
+        keys: Object.keys(flow)
+      }, 'flowsExecuteTool');
 
-    // Execute flow
-    const executionResult = await flowExecutionService.executeFlow(
-      flow,
-      initialVariables,
-      ref
-    );
+      const parsedFlow = flowService.parseFlow(flow);
 
-    const latencyMs = Date.now() - startTime;
-    log.info('Successfully executed flow', {
-      flowName,
-      nodesExecuted: executionResult.intermediateResults.length,
-      latencyMs,
-      status: executionResult.status
-    }, 'flowsExecuteTool');
+      // Debug: Log the parsed flow
+      log.info('Flow parsed successfully', {
+        flowName,
+        flowId: parsedFlow.meta?.id,
+        nodeCount: parsedFlow.nodes?.length || 0,
+        edgeCount: parsedFlow.edges?.length || 0,
+        templateNodeCount: parsedFlow.nodes?.filter(n => n.type === 'template')?.length || 0
+      }, 'flowsExecuteTool');
 
-    return executionResult;
+      // Execute flow
+      const executionResult = await flowExecutionService.executeFlow(
+        parsedFlow,
+        initialVariables,
+        ref
+      );
+
+      const latencyMs = Date.now() - startTime;
+      log.info('Successfully executed flow', {
+        flowName,
+        nodesExecuted: executionResult.intermediateResults.length,
+        latencyMs,
+        status: executionResult.status
+      }, 'flowsExecuteTool');
+
+      return executionResult;
+    } catch (validationError) {
+      log.error('Flow validation failed', validationError, {
+        flowName,
+        errorMessage: validationError.message,
+        errorCode: validationError.code,
+        errorKeys: Object.keys(validationError),
+        flowStructurePreview: JSON.stringify(flow, null, 2).substring(0, 1000),
+        flowKeys: Object.keys(flow),
+        hasMetadata: !!flow.metadata,
+        hasFlows: !!(flow.flows && Array.isArray(flow.flows))
+      }, 'flowsExecuteTool');
+
+      // Include detailed error information
+      const error = createMcpError(
+        'VALIDATION_ERROR',
+        `Flow validation failed: ${validationError.message}`,
+        'flows/execute',
+        {
+          errors: validationError.errors || [],
+          flowName,
+          flowStructure: typeof flow === 'object' ? 'object' : typeof flow
+        }
+      );
+
+      if (validationError.errors) {
+        error.details = validationError.errors.map(err => ({
+          field: err.field || err.path || 'unknown',
+          message: err.message,
+          params: err.params || {}
+        }));
+      }
+
+      throw error;
+    }
   } catch (error) {
     log.error('Error executing flow', error, { flowName, ref }, 'flowsExecuteTool');
 

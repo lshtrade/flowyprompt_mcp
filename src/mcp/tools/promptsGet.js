@@ -204,12 +204,23 @@ export default async function promptsGetTool(args) {
       latencyMs,
     }, 'promptsGetTool');
 
-    return {
-      content: generatedPrompt,
-      description: templateTitle,
-      arguments: arguments_,
+    const result = {
+      content: [{
+        type: 'text',
+        text: generatedPrompt,
+      }],
       isError: false,
     };
+
+    log.info('Returning prompts_get result', {
+      name,
+      resultType: typeof result,
+      contentType: Array.isArray(result.content) ? 'array' : typeof result.content,
+      contentLength: result.content?.length || 0,
+      textLength: generatedPrompt?.length || 0
+    }, 'promptsGetTool');
+
+    return result;
   } catch (error) {
     log.error('Error processing prompts_get', error, { name, ref }, 'promptsGetTool');
     metricsService.recordMcpTool('prompts_get', false);

@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "flowyprompt": {
+      "command": "node",
+      "args": [
+        "./index.js",
+        "--transport=stdio"
+      ],
+      "env": {}
+    }
+  }
+}

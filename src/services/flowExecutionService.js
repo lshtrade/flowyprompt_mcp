@@ -20,6 +20,24 @@ async function executeFlow(flow, initialVariables, ref = 'main') {
   // Extract template nodes only (filter out multi_input and result nodes)
   const templateNodes = flow.nodes.filter(node => node.type === 'template');
 
+  // Build variable map from multi_input nodes and merge with initial variables
+  const resolvedVariables = { ...initialVariables };
+  flow.nodes.filter(node => node.type === 'multi_input').forEach(inputNode => {
+    if (inputNode.data.variables) {
+      if (Array.isArray(inputNode.data.variables)) {
+        // New format: array of objects with key/value
+        inputNode.data.variables.forEach(v => {
+          if (typeof v === 'object' && v.key) {
+            resolvedVariables[v.key] = v.value || '';
+          }
+        });
+      } else {
+        // Fallback format
+        Object.assign(resolvedVariables, inputNode.data.variables);
+      }
+    }
+  });
+
   // Order nodes by dependencies (topological sort)
   let orderedNodes;
   try {
@@ -39,13 +57,19 @@ async function executeFlow(flow, initialVariables, ref = 'main') {
   // Execute each node in order
   for (const node of orderedNodes) {
     try {
-      // Resolve variables for this node
-      const resolvedVariables = mapVariables(node, initialVariables, intermediateResults);
+      // Resolve variables for this node (combine initial variables with node-specific variables)
+      const nodeVariables = { ...resolvedVariables };
+
+      // Add results from previous nodes
+      intermediateResults.forEach(result => {
+        nodeVariables[`${result.nodeId}_template`] = result.templateName;
+        nodeVariables[`${result.nodeId}_result`] = result.output;
+      });
 
       // Execute template
       const templateResult = await promptsGetTool({
         name: node.data.selectedTemplateId,
-        variables: resolvedVariables,
+        variables: nodeVariables,
         ref
       });
 

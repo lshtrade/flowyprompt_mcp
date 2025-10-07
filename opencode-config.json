@@ -1,0 +1,10 @@
+{
+  "name": "FlowyPrompt MCP",
+  "baseUrl": "http://localhost:3001",
+  "endpoints": {
+    "tools": "/tools",
+    "execute": "/tools/:toolName",
+    "health": "/health"
+  },
+  "version": "1.0.0"
+}

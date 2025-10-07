@@ -101,33 +101,12 @@ const flowSchema = {
                   enum: ['template', 'multi_input', 'result'],
                   description: 'Node type: template (executes), multi_input (entry), result (exit)'
                 },
-                position: {
-                  type: 'object',
-                  properties: {
-                    x: { type: 'number' },
-                    y: { type: 'number' }
-                  },
-                  description: 'Visual layout coordinates (optional)'
-                },
                 data: {
                   type: 'object',
                   properties: {
                     label: {
                       type: 'string',
                       description: 'Display name for the node'
-                    },
-                    template: {
-                      type: 'string',
-                      description: 'Template content with {variables} (template nodes only)'
-                    },
-                    variables: {
-                      type: 'array',
-                      items: { type: 'string' },
-                      description: 'List of variable names used (template/multi_input nodes)'
-                    },
-                    selectedTemplateId: {
-                      type: 'string',
-                      description: 'ID of saved template to execute (template nodes only)'
                     }
                   },
                   additionalProperties: true
@@ -140,12 +119,12 @@ const flowSchema = {
             type: 'array',
             items: {
               type: 'object',
-              required: ['id', 'source', 'target'],
+              required: ['source', 'target'],
               properties: {
                 id: {
                   type: 'string',
                   minLength: 1,
-                  description: 'Unique edge identifier within the flow'
+                  description: 'Unique edge identifier within the flow (optional for some edge types)'
                 },
                 source: {
                   type: 'string',
@@ -229,17 +208,19 @@ export function validateFlow(flowFile) {
     nodeIds.add(node.id);
   }
 
-  // Check edge ID uniqueness
+  // Check edge ID uniqueness (only for edges that have IDs)
   const edgeIds = new Set();
   for (const edge of flow.edges) {
-    if (edgeIds.has(edge.id)) {
-      semanticErrors.push({
-        field: `/flows/0/edges/${flow.edges.indexOf(edge)}/id`,
-        message: `Duplicate edge ID: ${edge.id}`,
-        params: { edgeId: edge.id }
-      });
+    if (edge.id) {
+      if (edgeIds.has(edge.id)) {
+        semanticErrors.push({
+          field: `/flows/0/edges/${flow.edges.indexOf(edge)}/id`,
+          message: `Duplicate edge ID: ${edge.id}`,
+          params: { edgeId: edge.id }
+        });
+      }
+      edgeIds.add(edge.id);
     }
-    edgeIds.add(edge.id);
   }
 
   // Check that edge source/target reference existing nodes
@@ -277,21 +258,9 @@ export function validateFlow(flowFile) {
           params: { nodeId: node.id }
         });
       }
-      if (!node.data.variables || node.data.variables.length === 0) {
-        semanticErrors.push({
-          field: `/flows/0/nodes/${flow.nodes.indexOf(node)}/data/variables`,
-          message: 'Template node must have at least one variable',
-          params: { nodeId: node.id }
-        });
-      }
-    }
-    if (node.type === 'multi_input') {
-      if (!node.data.variables || node.data.variables.length === 0) {
-        semanticErrors.push({
-          field: `/flows/0/nodes/${flow.nodes.indexOf(node)}/data/variables`,
-          message: 'Multi-input node must have at least one variable',
-          params: { nodeId: node.id }
-        });
+      // Variables can be either array or objects in multi_input nodes
+      if (node.data.variables && Array.isArray(node.data.variables) && node.data.variables.length === 0) {
+        // Allow empty variables array since some templates might not have variables
       }
     }
   }
