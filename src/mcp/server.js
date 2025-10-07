@@ -9,6 +9,9 @@ import config from '../config/index.js';
 import promptsListTool, { getPromptsListData } from './tools/promptsList.js';
 import promptsGetTool from './tools/promptsGet.js';
 import getVariableSets from './tools/getVariableSets.js';
+import flowsListTool from './tools/flowsList.js';
+import flowsShowTool from './tools/flowsShow.js';
+import flowsExecuteTool from './tools/flowsExecute.js';
 import metricsService from '../services/metricsService.js';
 
 /**
@@ -109,6 +112,70 @@ export async function startMcpServer() {
             required: ['name'],
           },
         },
+        {
+          name: 'flows_list',
+          description: 'List all available flow templates from GitHub repository',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              includeMetadata: {
+                type: 'boolean',
+                description: 'Include created/updated timestamps in metadata. Default: true',
+              },
+              ref: {
+                type: 'string',
+                description: 'Git reference (branch/tag/commit). Default: main',
+              },
+            },
+          },
+        },
+        {
+          name: 'flows_show',
+          description: 'Show detailed information about a specific flow including nodes, edges, and execution order',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              flowName: {
+                type: 'string',
+                description: 'Flow name (without .json extension)',
+              },
+              ref: {
+                type: 'string',
+                description: 'Git reference (branch/tag/commit). Default: main',
+              },
+              includePositions: {
+                type: 'boolean',
+                description: 'Include node position coordinates. Default: false',
+              },
+            },
+            required: ['flowName'],
+          },
+        },
+        {
+          name: 'flows_execute',
+          description: 'Execute a multi-step flow chain where template outputs feed into subsequent template inputs',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              flowName: {
+                type: 'string',
+                description: 'Flow name (without .json extension)',
+              },
+              initialVariables: {
+                type: 'object',
+                description: 'Initial variable values for the flow execution',
+                additionalProperties: {
+                  type: 'string',
+                },
+              },
+              ref: {
+                type: 'string',
+                description: 'Git reference (branch/tag/commit). Default: main',
+              },
+            },
+            required: ['flowName'],
+          },
+        },
       ],
     };
   });
@@ -162,6 +229,42 @@ export async function startMcpServer() {
 
       case 'get_variable_sets':
         return await getVariableSets(request.params.arguments || {});
+
+      case 'flows_list':
+        const flowsListResult = await flowsListTool(request.params.arguments || {});
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(flowsListResult, null, 2),
+            }
+          ],
+          isError: false,
+        };
+
+      case 'flows_show':
+        const flowsShowResult = await flowsShowTool(request.params.arguments || {});
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(flowsShowResult, null, 2),
+            }
+          ],
+          isError: false,
+        };
+
+      case 'flows_execute':
+        const flowsExecuteResult = await flowsExecuteTool(request.params.arguments || {});
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(flowsExecuteResult, null, 2),
+            }
+          ],
+          isError: false,
+        };
 
       default:
         throw new Error(`Unknown tool: ${request.params.name}`);

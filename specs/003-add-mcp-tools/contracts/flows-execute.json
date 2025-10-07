@@ -1,0 +1,342 @@
+{
+  "tool": "flows/execute",
+  "version": "1.0.0",
+  "description": "Execute a flow chain where template outputs automatically feed into subsequent template inputs",
+  "mcp_method": "tools/call",
+  "request": {
+    "name": "flows/execute",
+    "arguments": {
+      "flowName": {
+        "type": "string",
+        "required": true,
+        "description": "Name of the flow to execute (without .json extension)",
+        "example": "Marketing_Strategy"
+      },
+      "initialVariables": {
+        "type": "object",
+        "required": true,
+        "description": "Key-value pairs for initial variables (used by multi_input nodes and first templates)",
+        "example": {
+          "company_name": "TechCorp",
+          "market": "AI",
+          "budget": "100K"
+        }
+      },
+      "ref": {
+        "type": "string",
+        "required": false,
+        "default": "main",
+        "description": "GitHub ref (branch/tag) to fetch flow and templates from"
+      }
+    }
+  },
+  "response": {
+    "success": {
+      "type": "object",
+      "required": ["flowName", "executionId", "intermediateResults", "finalResult", "totalExecutionTimeMs", "status"],
+      "properties": {
+        "flowName": {
+          "type": "string",
+          "description": "Name of the executed flow",
+          "example": "Marketing_Strategy"
+        },
+        "executionId": {
+          "type": "string",
+          "description": "Unique identifier for this execution (timestamp-based)",
+          "example": "Marketing_Strategy_1696680000000"
+        },
+        "intermediateResults": {
+          "type": "array",
+          "description": "Results from each template execution in order",
+          "items": {
+            "type": "object",
+            "required": ["nodeId", "templateName", "inputVariables", "output", "executionTimeMs", "timestamp"],
+            "properties": {
+              "nodeId": {
+                "type": "string",
+                "description": "ID of the node that was executed",
+                "example": "node-2"
+              },
+              "templateName": {
+                "type": "string",
+                "description": "Name of the template that was executed",
+                "example": "Brand_Positioning_Strategy"
+              },
+              "inputVariables": {
+                "type": "object",
+                "description": "Variables used for this template execution",
+                "example": {
+                  "company_name": "TechCorp",
+                  "market": "AI"
+                }
+              },
+              "output": {
+                "type": "string",
+                "description": "Generated content from template execution",
+                "example": "TechCorp should position as an AI-first enterprise solution..."
+              },
+              "executionTimeMs": {
+                "type": "number",
+                "description": "Milliseconds taken to execute this template",
+                "example": 1234
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time",
+                "description": "ISO 8601 timestamp when execution completed",
+                "example": "2025-10-07T10:30:00.000Z"
+              }
+            }
+          }
+        },
+        "finalResult": {
+          "type": "string",
+          "description": "Output from the last template in the chain",
+          "example": "Complete marketing campaign plan with 5 key initiatives..."
+        },
+        "totalExecutionTimeMs": {
+          "type": "number",
+          "description": "Total time from start to finish in milliseconds",
+          "example": 2690
+        },
+        "status": {
+          "type": "string",
+          "enum": ["success", "partial", "failed"],
+          "description": "Execution status: success (all completed), partial (some failed), failed (validation/fatal error)"
+        }
+      }
+    },
+    "error": {
+      "type": "object",
+      "required": ["code", "message", "source"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "FLOW_NOT_FOUND",
+            "VALIDATION_ERROR",
+            "TEMPLATE_NOT_FOUND",
+            "EXECUTION_ERROR",
+            "CIRCULAR_DEPENDENCY",
+            "MISSING_VARIABLES",
+            "GITHUB_ERROR",
+            "PARSE_ERROR"
+          ],
+          "description": "Error code identifying the failure type"
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable error message",
+          "example": "Template execution failed at node: Campaign_Plan"
+        },
+        "source": {
+          "type": "string",
+          "const": "flows/execute",
+          "description": "Tool that generated the error"
+        },
+        "partialResults": {
+          "type": "array",
+          "description": "Results from successfully executed nodes before failure (if status=partial)",
+          "items": {
+            "type": "object",
+            "description": "Same structure as intermediateResults items"
+          }
+        },
+        "failedAt": {
+          "type": "object",
+          "description": "Information about where execution failed",
+          "properties": {
+            "nodeId": {
+              "type": "string",
+              "description": "ID of the node that failed"
+            },
+            "templateName": {
+              "type": "string",
+              "description": "Name of the template that failed"
+            },
+            "error": {
+              "type": "string",
+              "description": "Specific error that occurred"
+            }
+          }
+        }
+      }
+    }
+  },
+  "performance": {
+    "target": "< 5s for 3-node chain",
+    "description": "Total execution time depends on template complexity and count",
+    "factors": [
+      "Number of template nodes",
+      "Template execution time (variable, depends on template content)",
+      "GitHub API latency (cached templates are faster)",
+      "Variable substitution overhead (negligible)"
+    ]
+  },
+  "execution_algorithm": {
+    "steps": [
+      "1. Fetch flow definition from GitHub flows/{flowName}.json",
+      "2. Validate flow JSON structure against schema",
+      "3. Build dependency graph from edges",
+      "4. Check for circular dependencies (fail if found)",
+      "5. Perform topological sort to determine execution order",
+      "6. Collect initial variables from multi_input nodes",
+      "7. For each template node in topological order:",
+      "   a. Resolve variables (initial + previous outputs)",
+      "   b. Fetch template from GitHub (or cache)",
+      "   c. Execute template via prompts/get logic",
+      "   d. Store result with {nodeid}_result variable",
+      "   e. On error: stop execution, return partial results",
+      "8. Return all intermediate results + final result"
+    ]
+  },
+  "test_cases": [
+    {
+      "id": "TC-FLOW-EXEC-001",
+      "description": "Successful 2-node flow execution",
+      "given": "Flow 'Simple_Chain' has Node1 (template A) → Node2 (template B)",
+      "when": "User executes with initialVariables: {input: 'test'}",
+      "then": "Returns intermediateResults with 2 items, finalResult from Node2, status=success"
+    },
+    {
+      "id": "TC-FLOW-EXEC-002",
+      "description": "Variable mapping between nodes",
+      "given": "Node1 outputs 'result1', Node2 expects {node1_result} variable",
+      "when": "User executes flow",
+      "then": "Node2 receives node1_result variable with Node1's output"
+    },
+    {
+      "id": "TC-FLOW-EXEC-003",
+      "description": "Missing initial variables error",
+      "given": "Flow requires {company, market, budget}, user provides only {company, market}",
+      "when": "User executes flow",
+      "then": "Returns error with code=MISSING_VARIABLES, message lists 'budget'"
+    },
+    {
+      "id": "TC-FLOW-EXEC-004",
+      "description": "Template not found mid-flow",
+      "given": "Node1 succeeds, Node2 references non-existent template",
+      "when": "User executes flow",
+      "then": "Returns error with code=TEMPLATE_NOT_FOUND, partialResults contains Node1 result"
+    },
+    {
+      "id": "TC-FLOW-EXEC-005",
+      "description": "Circular dependency detection",
+      "given": "Flow has cycle: Node1 → Node2 → Node3 → Node1",
+      "when": "User executes flow",
+      "then": "Returns error with code=CIRCULAR_DEPENDENCY before any execution"
+    },
+    {
+      "id": "TC-FLOW-EXEC-006",
+      "description": "Partial results on failure",
+      "given": "3-node flow, Node2 fails after Node1 succeeds",
+      "when": "User executes flow",
+      "then": "Returns error with partialResults containing Node1 output, failedAt points to Node2"
+    },
+    {
+      "id": "TC-FLOW-EXEC-007",
+      "description": "Performance target (5s for 3 nodes)",
+      "given": "Flow with 3 template nodes, each takes ~1.5s",
+      "when": "User executes flow",
+      "then": "Total execution completes in < 5s, totalExecutionTimeMs < 5000"
+    }
+  ],
+  "examples": [
+    {
+      "description": "Successful marketing strategy flow execution",
+      "request": {
+        "name": "flows/execute",
+        "arguments": {
+          "flowName": "Marketing_Strategy",
+          "initialVariables": {
+            "company_name": "TechCorp",
+            "market": "AI",
+            "budget": "100K"
+          }
+        }
+      },
+      "response": {
+        "flowName": "Marketing_Strategy",
+        "executionId": "Marketing_Strategy_1696680000000",
+        "intermediateResults": [
+          {
+            "nodeId": "node-2",
+            "templateName": "Brand_Positioning_Strategy",
+            "inputVariables": {
+              "company_name": "TechCorp",
+              "market": "AI"
+            },
+            "output": "TechCorp should position as an AI-first enterprise solution provider focusing on scalable automation...",
+            "executionTimeMs": 1234,
+            "timestamp": "2025-10-07T10:30:00.000Z"
+          },
+          {
+            "nodeId": "node-3",
+            "templateName": "Campaign_Creation",
+            "inputVariables": {
+              "node2_result": "TechCorp should position as...",
+              "budget": "100K"
+            },
+            "output": "Q1 Campaign Plan:\n1. Thought Leadership Content Series ($30K)\n2. Industry Conference Sponsorship ($40K)\n3. Digital Advertising Campaign ($30K)...",
+            "executionTimeMs": 1456,
+            "timestamp": "2025-10-07T10:30:01.234Z"
+          }
+        ],
+        "finalResult": "Q1 Campaign Plan:\n1. Thought Leadership Content Series ($30K)...",
+        "totalExecutionTimeMs": 2690,
+        "status": "success"
+      }
+    },
+    {
+      "description": "Partial execution with template not found error",
+      "request": {
+        "name": "flows/execute",
+        "arguments": {
+          "flowName": "Broken_Flow",
+          "initialVariables": {
+            "input": "test"
+          }
+        }
+      },
+      "response": {
+        "code": "TEMPLATE_NOT_FOUND",
+        "message": "Template not found: Nonexistent_Template",
+        "source": "flows/execute",
+        "partialResults": [
+          {
+            "nodeId": "node-1",
+            "templateName": "First_Template",
+            "inputVariables": {
+              "input": "test"
+            },
+            "output": "Successfully generated content from first template",
+            "executionTimeMs": 1100,
+            "timestamp": "2025-10-07T10:30:00.000Z"
+          }
+        ],
+        "failedAt": {
+          "nodeId": "node-2",
+          "templateName": "Nonexistent_Template",
+          "error": "Template not found in repository"
+        }
+      }
+    },
+    {
+      "description": "Missing required variables error",
+      "request": {
+        "name": "flows/execute",
+        "arguments": {
+          "flowName": "Marketing_Strategy",
+          "initialVariables": {
+            "company_name": "TechCorp"
+          }
+        }
+      },
+      "response": {
+        "code": "MISSING_VARIABLES",
+        "message": "Missing required initial variables: market, budget",
+        "source": "flows/execute"
+      }
+    }
+  ]
+}

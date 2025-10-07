@@ -1,0 +1,211 @@
+{
+  "tool": "flows/list",
+  "version": "1.0.0",
+  "description": "List all available flow templates from flows/ directory in GitHub repository",
+  "mcp_method": "tools/call",
+  "request": {
+    "name": "flows/list",
+    "arguments": {
+      "includeMetadata": {
+        "type": "boolean",
+        "required": false,
+        "default": true,
+        "description": "Include full metadata (created/updated timestamps). If false, only returns name, description, version, nodeCount."
+      },
+      "ref": {
+        "type": "string",
+        "required": false,
+        "default": "main",
+        "description": "GitHub ref (branch/tag) to fetch flows from"
+      }
+    }
+  },
+  "response": {
+    "success": {
+      "type": "object",
+      "properties": {
+        "flows": {
+          "type": "array",
+          "description": "List of available flows",
+          "items": {
+            "type": "object",
+            "required": ["name", "description", "version", "nodeCount"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Flow name (filename without .json extension)",
+                "example": "Marketing_Strategy"
+              },
+              "description": {
+                "type": "string",
+                "description": "Flow description from metadata.description",
+                "example": "Multi-step marketing strategy generation flow"
+              },
+              "version": {
+                "type": "string",
+                "pattern": "^\\d+\\.\\d+\\.\\d+$",
+                "description": "Semantic version from metadata.version",
+                "example": "1.0.0"
+              },
+              "nodeCount": {
+                "type": "number",
+                "description": "Total number of nodes in the flow",
+                "example": 4
+              },
+              "created": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Creation timestamp (ISO 8601). Only if includeMetadata=true",
+                "example": "2025-10-07T00:00:00.000Z"
+              },
+              "updated": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Last updated timestamp (ISO 8601). Only if includeMetadata=true",
+                "example": "2025-10-07T10:30:00.000Z"
+              }
+            }
+          }
+        },
+        "cached": {
+          "type": "boolean",
+          "description": "Whether the response was served from cache"
+        }
+      }
+    },
+    "error": {
+      "type": "object",
+      "required": ["code", "message", "source"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "GITHUB_ERROR",
+            "PARSE_ERROR",
+            "NETWORK_ERROR",
+            "AUTH_ERROR"
+          ],
+          "description": "Error code identifying the failure type"
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable error message",
+          "example": "Failed to fetch flows from GitHub: Repository not found"
+        },
+        "source": {
+          "type": "string",
+          "const": "flows/list",
+          "description": "Tool that generated the error"
+        },
+        "details": {
+          "type": "object",
+          "description": "Additional error context (optional)"
+        }
+      }
+    }
+  },
+  "performance": {
+    "cached": {
+      "target": "< 300ms",
+      "description": "Response time when serving from cache"
+    },
+    "cold": {
+      "target": "< 2s",
+      "description": "Response time when fetching from GitHub API"
+    }
+  },
+  "caching": {
+    "strategy": "ETag-based revalidation",
+    "ttl": "15 minutes",
+    "key_format": "flows:list:{ref}"
+  },
+  "test_cases": [
+    {
+      "id": "TC-FLOW-LIST-001",
+      "description": "Successful flow list retrieval",
+      "given": "GitHub repository contains 3 flow JSON files in flows/ directory",
+      "when": "User calls flows/list with default parameters",
+      "then": "Returns array of 3 flows with name, description, version, nodeCount, created, updated"
+    },
+    {
+      "id": "TC-FLOW-LIST-002",
+      "description": "Handle empty flows directory",
+      "given": "GitHub repository has flows/ directory but no .json files",
+      "when": "User calls flows/list",
+      "then": "Returns empty flows array with cached=false"
+    },
+    {
+      "id": "TC-FLOW-LIST-003",
+      "description": "Handle malformed flow JSON",
+      "given": "One flow file has invalid JSON syntax",
+      "when": "User calls flows/list",
+      "then": "Skips invalid file, returns valid flows, logs warning"
+    },
+    {
+      "id": "TC-FLOW-LIST-004",
+      "description": "Cache hit performance",
+      "given": "Flow list was fetched 5 minutes ago and cached",
+      "when": "User calls flows/list again",
+      "then": "Returns cached result in < 300ms with cached=true"
+    },
+    {
+      "id": "TC-FLOW-LIST-005",
+      "description": "GitHub API failure handling",
+      "given": "GitHub API returns 500 Internal Server Error",
+      "when": "User calls flows/list",
+      "then": "Returns error with code=GITHUB_ERROR, includes error details"
+    }
+  ],
+  "examples": [
+    {
+      "description": "List flows with full metadata",
+      "request": {
+        "name": "flows/list",
+        "arguments": {
+          "includeMetadata": true
+        }
+      },
+      "response": {
+        "flows": [
+          {
+            "name": "Marketing_Strategy",
+            "description": "Multi-step marketing strategy generation flow",
+            "version": "1.0.0",
+            "nodeCount": 4,
+            "created": "2025-10-07T00:00:00.000Z",
+            "updated": "2025-10-07T10:30:00.000Z"
+          },
+          {
+            "name": "Content_Pipeline",
+            "description": "Research to draft to final content flow",
+            "version": "1.2.0",
+            "nodeCount": 5,
+            "created": "2025-09-15T00:00:00.000Z",
+            "updated": "2025-10-01T00:00:00.000Z"
+          }
+        ],
+        "cached": false
+      }
+    },
+    {
+      "description": "List flows without metadata (minimal)",
+      "request": {
+        "name": "flows/list",
+        "arguments": {
+          "includeMetadata": false
+        }
+      },
+      "response": {
+        "flows": [
+          {
+            "name": "Marketing_Strategy",
+            "description": "Multi-step marketing strategy generation flow",
+            "version": "1.0.0",
+            "nodeCount": 4
+          }
+        ],
+        "cached": true
+      }
+    }
+  ]
+}

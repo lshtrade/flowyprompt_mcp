@@ -312,6 +312,175 @@ Tool: get_variable_sets
 }
 ```
 
+---
+
+## 🔗 Flow Execution
+
+Execute multi-step template chains where the output of one template automatically flows into the input variables of subsequent templates.
+
+### flows/list
+
+List all available flow templates from your GitHub repository.
+
+**Parameters**:
+- `includeMetadata` (optional): Include created/updated timestamps. Default: true
+- `ref` (optional): Git reference (branch/tag/commit)
+
+**Example**:
+```
+Tool: flows/list
+```
+
+**Returns**:
+```json
+{
+  "flows": [
+    {
+      "name": "Marketing_Strategy",
+      "description": "Generate comprehensive marketing strategy with market analysis and content plan",
+      "version": "1.0.0",
+      "nodeCount": 3,
+      "created": "2025-01-06T10:00:00.000Z",
+      "updated": "2025-01-06T10:00:00.000Z"
+    }
+  ],
+  "cached": false
+}
+```
+
+### flows/execute
+
+Execute a multi-step flow where template outputs feed into subsequent template inputs.
+
+**Parameters**:
+- `flowName` (required): Flow name (without .json extension)
+- `initialVariables` (required): Initial variable values for the flow
+- `ref` (optional): Git reference (branch/tag/commit)
+
+**Example**:
+```
+Tool: flows/execute
+{
+  "flowName": "Simple_Chain",
+  "initialVariables": {
+    "topic": "Artificial Intelligence in Healthcare"
+  }
+}
+```
+
+**Returns**:
+```json
+{
+  "flowName": "Simple_Chain",
+  "executionId": "Simple_Chain_1704539400000",
+  "intermediateResults": [
+    {
+      "nodeId": "node-1",
+      "templateName": "Topic_Analysis",
+      "inputVariables": {
+        "topic": "Artificial Intelligence in Healthcare"
+      },
+      "output": "AI in healthcare analysis...",
+      "executionTimeMs": 450,
+      "timestamp": "2025-01-06T10:30:00.000Z"
+    },
+    {
+      "nodeId": "node-2",
+      "templateName": "Content_Summarizer",
+      "inputVariables": {
+        "topic": "Artificial Intelligence in Healthcare",
+        "node1_result": "AI in healthcare analysis..."
+      },
+      "output": "Summary of AI in healthcare...",
+      "executionTimeMs": 380,
+      "timestamp": "2025-01-06T10:30:01.000Z"
+    }
+  ],
+  "finalResult": "Summary of AI in healthcare...",
+  "totalExecutionTimeMs": 830,
+  "status": "success"
+}
+```
+
+**Variable Mapping**:
+- Previous node outputs are automatically available as `{nodeX_result}` variables
+- Example: node-1's output becomes `{node1_result}` for subsequent nodes
+- Initial variables remain available throughout the flow
+
+**Error Handling**:
+- If a template execution fails, partial results are returned
+- The `failedAt` field indicates which node failed
+- Example error response:
+```json
+{
+  "code": "TEMPLATE_NOT_FOUND",
+  "message": "Template not found: InvalidTemplate",
+  "partialResults": [
+    {
+      "nodeId": "node-1",
+      "templateName": "Topic_Analysis",
+      "output": "AI in healthcare analysis...",
+      "executionTimeMs": 450
+    }
+  ],
+  "failedAt": {
+    "nodeId": "node-2",
+    "templateName": "InvalidTemplate",
+    "error": "Template not found"
+  }
+}
+```
+
+**Flow Definition Example**:
+
+Flows are JSON files stored under `flows/` in your GitHub repository, named as `flows/<Flow_Name>.json`.
+
+```json
+{
+  "metadata": {
+    "name": "Simple_Chain",
+    "description": "Two-step content analysis flow",
+    "version": "1.0.0"
+  },
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "template",
+      "data": {
+        "label": "Topic Analysis",
+        "selectedTemplateId": "Topic_Analysis",
+        "variables": ["topic"]
+      }
+    },
+    {
+      "id": "node-2",
+      "type": "template",
+      "data": {
+        "label": "Summarizer",
+        "selectedTemplateId": "Content_Summarizer",
+        "variables": ["topic", "node1_result"]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "node-1",
+      "target": "node-2",
+      "type": "chain"
+    }
+  ]
+}
+```
+
+**Key Features**:
+- ✅ Topological sort ensures correct execution order
+- ✅ Circular dependency detection prevents infinite loops
+- ✅ Partial results returned on failure for debugging
+- ✅ Performance target: <5s for 3-node chains
+
+---
+
 ## 🏗️ Template Format
 
 Templates are JSON files stored under `templates/` in your GitHub repository, named as `templates/<Template_Name>.json`.
