@@ -1,13 +1,20 @@
 #!/usr/bin/env node
 
-// Entry point for MCP server (stdio transport)
+// Entry point for FlowyPrompt MCP Server (stdio transport only)
 import { startMcpServer } from './src/mcp/server.js';
 import { log } from './src/utils/logger.js';
 
 async function main() {
   try {
-    log.info('Starting FlowyPrompt MCP Server', {}, 'main');
+    log.info('Starting FlowyPrompt MCP Server', {
+      nodeVersion: process.version,
+      platform: process.platform,
+      args: process.argv.slice(2)
+    }, 'main');
+
+    // Start MCP server with stdio transport
     await startMcpServer();
+
   } catch (error) {
     log.error('Failed to start MCP server', error, {}, 'main');
     process.exit(1);

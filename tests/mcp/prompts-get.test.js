@@ -57,7 +57,7 @@ describe('MCP Tool: prompts/get', () => {
     const mockTemplate = {
       metadata: {
         name: 'Brand_Positioning_Strategy',
-        description: '브랜드 포지셔닝 전략 수립',
+        description: 'Develop comprehensive brand positioning strategy',
         version: '1.0.0',
         tags: ['marketing']
       },
@@ -77,16 +77,17 @@ describe('MCP Tool: prompts/get', () => {
     const result = await promptsGetTool({
       name: 'Brand_Positioning_Strategy',
       variables: {
-        company_name: '테크스타트업',
+        company_name: 'TechStartup Inc',
         industry: 'AI'
       }
     });
 
     // Verify response structure
-    expect(result.description).toBe('Brand_Positioning_Strategy');
-    expect(result.content).toContain('테크스타트업');
-    expect(result.content).toContain('AI');
     expect(result.isError).toBe(false);
+    expect(Array.isArray(result.content)).toBe(true);
+    expect(result.content[0].type).toBe('text');
+    expect(result.content[0].text).toContain('TechStartup Inc');
+    expect(result.content[0].text).toContain('AI');
 
     // Verify services called correctly
     expect(mockGithubService.fetchFile).toHaveBeenCalledWith(
@@ -122,7 +123,8 @@ describe('MCP Tool: prompts/get', () => {
     });
 
     // Verify substitution worked
-    expect(result.content).toBe('Content: Value1 and Value2');
+    expect(Array.isArray(result.content)).toBe(true);
+    expect(result.content[0].text).toBe('Content: Value1 and Value2');
   });
 
   // T012: TC-GET-002 - Missing required variable
@@ -152,7 +154,8 @@ describe('MCP Tool: prompts/get', () => {
     });
 
     // Should complete but contain unreplaced placeholder
-    expect(result.content).toContain('{required_var}');
+    expect(Array.isArray(result.content)).toBe(true);
+    expect(result.content[0].text).toContain('{required_var}');
   });
 
   // T013: TC-GET-003 - Optional variable handling
@@ -183,7 +186,8 @@ describe('MCP Tool: prompts/get', () => {
 
     // Should not throw error
     expect(result.content).toBeDefined();
-    expect(result.content).toContain('Required: Value');
+    expect(Array.isArray(result.content)).toBe(true);
+    expect(result.content[0].text).toContain('Required: Value');
   });
 
   // T014: TC-GET-004 - Template not found
@@ -228,7 +232,8 @@ describe('MCP Tool: prompts/get', () => {
     });
 
     // Should convert and substitute
-    expect(result.content).toContain('123');
+    expect(Array.isArray(result.content)).toBe(true);
+    expect(result.content[0].text).toContain('123');
   });
 
   // Additional: Cache usage
@@ -256,7 +261,8 @@ describe('MCP Tool: prompts/get', () => {
     const elapsed = Date.now() - startTime;
 
     // Verify used cache
-    expect(result.content).toBeDefined();
+    expect(Array.isArray(result.content)).toBe(true);
+    expect(result.content[0].text).toBeDefined();
     expect(elapsed).toBeLessThan(300); // Fast response from cache
 
     // GitHub should NOT be called
@@ -285,6 +291,7 @@ describe('MCP Tool: prompts/get', () => {
       variables: {}
     });
 
-    expect(result.content).toContain('Static content with no variables');
+    expect(Array.isArray(result.content)).toBe(true);
+    expect(result.content[0].text).toContain('Static content with no variables');
   });
 });

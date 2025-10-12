@@ -64,6 +64,10 @@ const logger = winston.createLogger({
 
 // Helper methods for structured logging
 export const log = {
+  debug: (message, context = {}, module = 'app') => {
+    logger.debug(message, { module, context });
+  },
+
   info: (message, context = {}, module = 'app') => {
     logger.info(message, { module, context });
   },

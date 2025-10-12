@@ -5,6 +5,105 @@ All notable changes to FlowyPrompt MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2025-10-07
+
+### 🎉 Feature Release: Multi-Step Flow Execution
+
+This release adds support for executing multi-step template chains where the output of one template automatically flows into subsequent templates.
+
+### Added
+
+- **MCP Tools**:
+  - `flows/list`: List all available flow templates from GitHub repository
+  - `flows/execute`: Execute multi-step flow chains with automatic variable mapping
+
+- **Flow Execution Service** (`src/services/flowExecutionService.js`):
+  - `executeFlow()`: Orchestrate multi-step template execution
+  - Topological sort for execution ordering
+  - Partial results on failure for debugging
+  - Performance tracking per node execution
+
+- **Flow Service** (`src/services/flowService.js`):
+  - `parseFlow()`: Parse and validate flow JSON structures
+  - `validateFlowSchema()`: JSON schema validation for flows
+  - `extractTemplateNodes()`: Filter template nodes from flow
+  - `validateNodeReferences()`: Validate edge source/target references
+
+- **Flow Libraries**:
+  - `src/lib/topologicalSort.js`: Graph-based execution ordering using graphlib
+  - `src/lib/variableMapper.js`: Variable resolution from multiple sources
+
+- **Flow Schema** (`src/models/flowSchema.js`):
+  - JSON Schema for FlowyPrompt flow structure
+  - Validation for node types (template/multi_input/result)
+  - Validation for edge types (data/chain)
+  - Node ID uniqueness enforcement
+  - Edge reference validation
+
+- **Enhanced GitHub Service**:
+  - `listFlows()`: List all flow files from flows/ directory
+  - `fetchFlow()`: Fetch specific flow definition
+  - Request deduplication for flow operations
+  - Retry logic with exponential backoff
+
+### Features
+
+- **Topological Sort**: Uses graphlib for robust cycle detection and dependency resolution
+- **Variable Mapping**: Automatic variable resolution with priority (previous outputs > initial variables)
+- **Circular Dependency Detection**: Prevents infinite loops before execution
+- **Partial Results**: Returns intermediate results on failure for debugging
+- **Performance Target**: <5s for 3-node flow chains
+
+### Variable Naming Convention
+
+- Previous node outputs are available as `{nodeX_result}` variables
+- Example: node-1 output becomes `{node1_result}` for subsequent nodes
+- Template names available as `{nodeX_template}`
+
+### Error Handling
+
+- Partial results included in error response when execution fails
+- `failedAt` field indicates which node caused the failure
+- Clear error messages for template not found, circular dependencies, missing variables
+
+### Dependencies
+
+- Added: `graphlib@^2.1.8` for topological sorting
+- Added: `ajv@^8.17.1` for JSON schema validation
+- Added: `ajv-formats@^3.0.1` for schema format validation
+
+### Testing
+
+- Contract tests: flows/list (7 tests), flows/execute (8 tests)
+- Unit tests: topologicalSort (7 tests), variableMapper (6 tests), flowService (10 tests), flowExecutionService (7 tests)
+- Integration test: end-to-end flow execution
+- Test coverage: ≥85% for all new modules
+
+### Documentation
+
+- README updated with Flow Execution section
+- Flow definition format documented
+- Variable mapping examples
+- Error handling examples
+- Performance targets documented
+
+### Performance
+
+- flows/list cached fetch: <300ms
+- flows/execute 3-node chain: <5s
+- Individual template execution time tracking
+- Topological sort overhead: negligible (<10ms)
+
+### Breaking Changes
+
+None. This is a backward-compatible feature addition.
+
+### Migration
+
+No migration needed. Existing prompt templates continue to work unchanged.
+
+---
+
 ## [2.0.0] - 2025-01-06
 
 ### 🎉 Major Release: MCP Transformation

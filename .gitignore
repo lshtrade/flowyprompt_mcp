@@ -64,3 +64,6 @@ temp/
 
 # Archives created by npm pack
 *.tgz
+
+# Documentation and specifications
+specs/

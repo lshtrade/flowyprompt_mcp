@@ -60,15 +60,39 @@ export default async function promptsGetTool(args) {
       templateTitle = actualTemplate.title || name;
     } else if (actualTemplate.metadata && actualTemplate.results) {
       // Original format (fallback)
-      templateText = actualTemplate.results.map(r => r.content).join('\n\n');
-      templateVars = (actualTemplate.variables || []).map(v => v.name);
-      templateTitle = actualTemplate.metadata.name;
-    } else {
-      throw createMcpError(
-        'VALIDATION_ERROR',
-        'Invalid template structure: unsupported format',
-        'template'
-      );
+      // Handle case where results might be a string or array
+      if (Array.isArray(actualTemplate.results)) {
+        templateText = actualTemplate.results.map(r => r.content).join('\n');
+      } else if (typeof actualTemplate.results === 'string') {
+        templateText = actualTemplate.results;
+      } else if (actualTemplate.results && actualTemplate.results.content) {
+        templateText = actualTemplate.results.content;
+      } else {
+      // Try to handle unknown formats gracefully
+      log.warn('Unknown template format, attempting to extract content', {
+        templateName: name,
+        availableKeys: Object.keys(actualTemplate),
+        templateType: typeof actualTemplate
+      }, 'promptsGetTool');
+      
+      // Last resort: try to extract content from various possible locations
+      if (typeof actualTemplate === 'string') {
+        templateText = actualTemplate;
+      } else if (actualTemplate.content) {
+        templateText = typeof actualTemplate.content === 'string' 
+          ? actualTemplate.content 
+          : JSON.stringify(actualTemplate.content);
+      } else if (actualTemplate.template) {
+        templateText = actualTemplate.template;
+      } else {
+        throw createMcpError(
+          'VALIDATION_ERROR',
+          `Invalid template structure: unsupported format. Available keys: ${Object.keys(actualTemplate).join(', ')}`,
+          'template'
+        );
+      }
+      templateTitle = actualTemplate.title || actualTemplate.name || name;
+    }
     }
 
     // Handle variable value set selection
@@ -180,12 +204,23 @@ export default async function promptsGetTool(args) {
       latencyMs,
     }, 'promptsGetTool');
 
-    return {
-      content: generatedPrompt,
-      description: templateTitle,
-      arguments: arguments_,
+    const result = {
+      content: [{
+        type: 'text',
+        text: generatedPrompt,
+      }],
       isError: false,
     };
+
+    log.info('Returning prompts_get result', {
+      name,
+      resultType: typeof result,
+      contentType: Array.isArray(result.content) ? 'array' : typeof result.content,
+      contentLength: result.content?.length || 0,
+      textLength: generatedPrompt?.length || 0
+    }, 'promptsGetTool');
+
+    return result;
   } catch (error) {
     log.error('Error processing prompts_get', error, { name, ref }, 'promptsGetTool');
     metricsService.recordMcpTool('prompts_get', false);
