@@ -85,6 +85,8 @@ Add the MCP server to your Claude Desktop configuration file:
 
 ## 📡 MCP Features
 
+**Note**: HTTP Streamable MCP is not yet supported. This server currently only supports stdio transport for Claude Desktop integration.
+
 ### ➕ Prompts (Quick Template Access)
 
 Use the "+" button in Claude Desktop to access prompt templates with variable set support.

@@ -31,7 +31,7 @@ const mockLogger = {
 };
 
 /**
- * Generate platform configurations (local implementation)
+ * Generate platform configurations (stdio transport only)
  */
 function generatePlatformConfigs() {
   return {
@@ -39,89 +39,29 @@ function generatePlatformConfigs() {
       mcpServers: {
         flowyprompt: {
           command: 'node',
-          args: [scriptPath, '--transport=stdio'],
+          args: [scriptPath],
           env: {}
         }
       }
-    },
-
-    'claude-desktop-http.json': {
-      mcpServers: {
-        flowyprompt: {
-          command: 'node',
-          args: [scriptPath, '--transport=http', `--port=${mockConfig.httpPort}`],
-          env: {}
-        }
-      }
-    },
-
-    'chatgpt-config.json': {
-      name: 'FlowyPrompt',
-      description: 'FlowyPrompt template and flow management',
-      baseUrl: `http://localhost:${mockConfig.httpPort}`,
-      endpoints: {
-        tools: '/tools',
-        execute: '/tools/:toolName',
-        health: '/health'
-      },
-      authentication: 'none'
-    },
-
-    'opencode-config.json': {
-      name: 'FlowyPrompt MCP',
-      baseUrl: `http://localhost:${mockConfig.httpPort}`,
-      endpoints: {
-        tools: '/tools',
-        execute: '/tools/:toolName',
-        health: '/health'
-      },
-      version: mockConfig.mcp.serverVersion
     }
   };
 }
 
 /**
- * Generate platform-specific configuration files
+ * Generate platform-specific configuration files (stdio transport only)
  */
 export function generateConfigFiles(outputDir = process.cwd()) {
   const configs = generatePlatformConfigs();
   const generatedFiles = [];
 
   try {
-    // Claude Desktop configuration (STDIO)
+    // Claude Desktop configuration (STDIO only)
     const claudeDesktopPath = join(outputDir, 'claude-desktop.json');
     writeFileSync(claudeDesktopPath, JSON.stringify(configs['claude-desktop.json'], null, 2));
     generatedFiles.push({
-      platform: 'Claude Desktop (STDIO)',
+      platform: 'Claude Desktop',
       file: 'claude-desktop.json',
       path: claudeDesktopPath
-    });
-
-    // Claude Desktop configuration (HTTP)
-    const claudeDesktopHttpPath = join(outputDir, 'claude-desktop-http.json');
-    writeFileSync(claudeDesktopHttpPath, JSON.stringify(configs['claude-desktop-http.json'], null, 2));
-    generatedFiles.push({
-      platform: 'Claude Desktop (HTTP)',
-      file: 'claude-desktop-http.json',
-      path: claudeDesktopHttpPath
-    });
-
-    // ChatGPT configuration
-    const chatgptPath = join(outputDir, 'chatgpt-config.json');
-    writeFileSync(chatgptPath, JSON.stringify(configs['chatgpt-config.json'], null, 2));
-    generatedFiles.push({
-      platform: 'ChatGPT',
-      file: 'chatgpt-config.json',
-      path: chatgptPath
-    });
-
-    // OpenCode configuration
-    const opencodePath = join(outputDir, 'opencode-config.json');
-    writeFileSync(opencodePath, JSON.stringify(configs['opencode-config.json'], null, 2));
-    generatedFiles.push({
-      platform: 'OpenCode',
-      file: 'opencode-config.json',
-      path: opencodePath
     });
 
     mockLogger.info('Platform configuration files generated', {
@@ -137,12 +77,9 @@ export function generateConfigFiles(outputDir = process.cwd()) {
 }
 
 /**
- * Generate usage instructions for different platforms
+ * Generate usage instructions for Claude Desktop (stdio transport only)
  */
 export function generateUsageInstructions(outputDir = process.cwd()) {
-  const port = mockConfig.httpPort || 3001;
-  const baseUrl = `http://localhost:${port}`;
-
   const instructions = {
     claudeDesktop: {
       title: 'Claude Desktop Configuration',
@@ -156,61 +93,7 @@ export function generateUsageInstructions(outputDir = process.cwd()) {
         file: 'claude-desktop.json',
         transport: 'STDIO',
         description: 'Direct MCP communication via standard input/output'
-      },
-      http: {
-        file: 'claude-desktop-http.json',
-        transport: 'HTTP',
-        description: 'MCP communication via HTTP endpoints'
       }
-    },
-
-    claudeCode: {
-      title: 'Claude Code Configuration',
-      instructions: [
-        '1. Add the following to your Claude Code settings:',
-        '   - For STDIO: Use the stdio command from claude-desktop.json',
-        '   - For HTTP: Use the HTTP endpoints directly',
-        '2. Restart Claude Code',
-        '3. FlowyPrompt tools will be available in Claude Code'
-      ],
-      stdio: {
-        command: 'node index.js --transport=stdio',
-        description: 'Start server with STDIO transport'
-      },
-      http: {
-        baseUrl,
-        endpoints: {
-          tools: `${baseUrl}/tools`,
-          execute: `${baseUrl}/tools/:toolName`,
-          health: `${baseUrl}/health`
-        }
-      }
-    },
-
-    chatgpt: {
-      title: 'ChatGPT Integration',
-      instructions: [
-        '1. Use the HTTP API endpoints directly',
-        '2. POST requests to /tools/:toolName for tool execution',
-        '3. GET requests to /tools for available tools'
-      ],
-      baseUrl,
-      endpoints: {
-        tools: `${baseUrl}/tools`,
-        execute: `${baseUrl}/tools/:toolName`,
-        health: `${baseUrl}/health`
-      }
-    },
-
-    opencode: {
-      title: 'OpenCode Integration',
-      instructions: [
-        '1. Use the HTTP API endpoints',
-        '2. Configure OpenCode to use the HTTP endpoints',
-        '3. Tools available via REST API calls'
-      ],
-      baseUrl,
-      config: 'opencode-config.json'
     }
   };
 
@@ -224,31 +107,10 @@ export function generateUsageInstructions(outputDir = process.cwd()) {
     });
 
     if (info.stdio) {
-      markdown += '\n### STDIO Configuration\n';
+      markdown += '\n### Configuration\n';
       markdown += `- **Config File**: ${info.stdio.file}\n`;
       markdown += `- **Transport**: ${info.stdio.transport}\n`;
-      if (info.stdio.command) {
-        markdown += `- **Command**: ${info.stdio.command}\n`;
-      }
       markdown += `- **Description**: ${info.stdio.description}\n`;
-    }
-
-    if (info.http) {
-      markdown += '\n### HTTP Configuration\n';
-      markdown += `- **Config File**: ${info.http.file}\n`;
-      markdown += `- **Transport**: ${info.http.transport}\n`;
-      markdown += `- **Description**: ${info.http.description}\n`;
-    }
-
-    if (info.endpoints) {
-      markdown += '\n### API Endpoints\n';
-      Object.entries(info.endpoints).forEach(([name, url]) => {
-        markdown += `- **${name}**: ${url}\n`;
-      });
-    }
-
-    if (info.baseUrl) {
-      markdown += `- **Base URL**: ${info.baseUrl}\n`;
     }
 
     markdown += '\n';
@@ -257,19 +119,21 @@ export function generateUsageInstructions(outputDir = process.cwd()) {
   // Add troubleshooting section
   markdown += `## Troubleshooting\n\n`;
   markdown += `### Common Issues\n`;
-  markdown += `1. **Port already in use**: Change the port using \`PORT=3002 node index.js --transport=http\`\n`;
-  markdown += `2. **CORS issues**: The HTTP server includes CORS headers for all origins\n`;
-  markdown += `3. **Connection timeouts**: Ensure the server is running before configuring clients\n\n`;
+  markdown += `1. **MCP Server Not Appearing**: Check that the config file path is correct and restart Claude Desktop\n`;
+  markdown += `2. **Connection Issues**: Ensure the server starts without errors by running \`node index.js\`\n`;
+  markdown += `3. **Configuration Errors**: Verify all required environment variables are set in the config file\n\n`;
 
   markdown += `### Testing the Server\n`;
-  markdown += `- **Health Check**: GET ${baseUrl}/health\n`;
-  markdown += `- **List Tools**: GET ${baseUrl}/tools\n`;
-  markdown += `- **Test Tool**: POST ${baseUrl}/tools/health_check\n\n`;
+  markdown += `- **Manual Test**: Run \`node index.js\` to verify the server starts without errors\n`;
+  markdown += `- **Health Check**: Use the \`health_check\` tool in Claude Desktop\n`;
+  markdown += `- **List Tools**: Use the \`prompts_list\` tool to verify GitHub connectivity\n\n`;
 
   markdown += `### Environment Variables\n`;
-  markdown += `- \`MCP_TRANSPORT\`: Set to "stdio" or "http" (default: "stdio")\n`;
-  markdown += `- \`PORT\`: Set HTTP server port (default: 3001)\n`;
-  markdown += `- \`HTTP_PORT\`: Alternative port setting (default: 3001)\n\n`;
+  markdown += `- \`GITHUB_PAT\`: GitHub Personal Access Token (required)\n`;
+  markdown += `- \`GITHUB_REPO_URL\`: GitHub repository URL (required)\n`;
+  markdown += `- \`GITHUB_REF\`: Git reference (default: main)\n`;
+  markdown += `- \`MCP_SERVER_NAME\`: Server name (default: flowyprompt-mcp-server)\n`;
+  markdown += `- \`MCP_SERVER_VERSION\`: Server version (default: 1.0.0)\n\n`;
 
   try {
     writeFileSync(usageGuidePath, markdown);
