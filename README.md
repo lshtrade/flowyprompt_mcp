@@ -24,6 +24,29 @@ Model Context Protocol (MCP) server for Claude Desktop integration, providing pr
 - GitHub Personal Access Token (PAT) with repository read access
 - Claude Desktop app
 
+#### GitHub PAT Token Permissions
+
+When creating your GitHub Personal Access Token, ensure it has the following permissions:
+
+**Required Scopes:**
+- `repo` - Full control of private repositories
+  - `repo:status` - Access commit status
+  - `repo_deployment` - Access deployment status
+  - `public_repo` - Access public repositories
+  - `repo:invite` - Access repository invitations
+  - `security_events` - Read and write security events
+
+**Alternative (Minimal) Scopes:**
+If you only need to access public repositories, you can use:
+- `public_repo` - Access public repositories only
+
+**Token Creation Steps:**
+1. Go to GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+2. Click "Generate new token (classic)"
+3. Select the `repo` scope (or `public_repo` for public repos only)
+4. Copy the generated token (starts with `ghp_`)
+5. Use this token as the `GITHUB_PAT` value in your Claude Desktop configuration
+
 ### Installation
 
 ```bash
@@ -84,6 +107,8 @@ Add the MCP server to your Claude Desktop configuration file:
 4. **Use health check**: Run the `health_check` tool to verify configuration
 
 ## 📡 MCP Features
+
+**Note**: HTTP Streamable MCP is not yet supported. This server currently only supports stdio transport for Claude Desktop integration.
 
 ### ➕ Prompts (Quick Template Access)
 

@@ -6,7 +6,17 @@
         "./index.js",
         "--transport=stdio"
       ],
-      "env": {}
+      "env": {
+        "GITHUB_PAT": "ghp_test_token_for_development",
+        "GITHUB_REPO_URL": "https://github.com/flowyprompt/templates",
+        "GITHUB_REF": "main",
+        "MCP_SERVER_NAME": "flowyprompt-mcp-server",
+        "MCP_SERVER_VERSION": "1.0.0",
+        "CACHE_TTL_MS": "900000",
+        "MAX_FILE_SIZE": "102400",
+        "LOG_LEVEL": "info",
+        "RETRY_ATTEMPTS": "3"
+      }
     }
   }
 }

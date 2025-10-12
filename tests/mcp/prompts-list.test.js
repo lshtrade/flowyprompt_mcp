@@ -60,13 +60,13 @@ describe('MCP Tool: prompts/list', () => {
     const mockTemplate1 = {
       metadata: {
         name: 'Brand_Positioning_Strategy',
-        description: '브랜드 포지셔닝 전략 수립',
+        description: 'Develop comprehensive brand positioning strategy',
         version: '1.0.0',
         tags: ['marketing', 'strategy']
       },
       variables: [
-        { name: 'company_name', description: '회사명', required: true },
-        { name: 'industry', description: '산업', required: true }
+        { name: 'company_name', description: 'Company or brand name', required: true },
+        { name: 'industry', description: 'Industry sector', required: true }
       ],
       results: [{ name: 'section1', content: '{{company_name}} in {{industry}}' }]
     };
@@ -74,11 +74,11 @@ describe('MCP Tool: prompts/list', () => {
     const mockTemplate2 = {
       metadata: {
         name: 'AI_Analysis_Report',
-        description: 'AI 분석 보고서',
+        description: 'Generate AI technology analysis report',
         version: '1.0.0'
       },
       variables: [
-        { name: 'technology', description: 'AI 기술', required: true }
+        { name: 'technology', description: 'AI technology to analyze', required: true }
       ],
       results: [{ name: 'section1', content: '{{technology}} analysis' }]
     };
@@ -100,7 +100,7 @@ describe('MCP Tool: prompts/list', () => {
     // Check first template
     expect(result[0]).toMatchObject({
       name: 'Brand_Positioning_Strategy',
-      description: '브랜드 포지셔닝 전략 수립'
+      description: 'Develop comprehensive brand positioning strategy'
     });
     expect(result[0].arguments).toBeInstanceOf(Array);
     expect(result[0].arguments).toHaveLength(2);
