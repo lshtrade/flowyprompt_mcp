@@ -5,6 +5,8 @@
 
 Model Context Protocol (MCP) server for Claude Desktop integration, providing prompt template management with automatic variable extraction, substitution, and GitHub repository synchronization.
 
+🌐 **Web App**: [flowyprompt.com](https://flowyprompt.com) - Create and manage prompt templates online
+
 ## 🎯 Features
 
 - **🤖 Claude Desktop Integration**: Native MCP protocol support via stdio transport
