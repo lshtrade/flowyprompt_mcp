@@ -52,7 +52,6 @@ describe('MCP stdio transport integration', () => {
       }),
       expect.objectContaining({
         capabilities: expect.objectContaining({
-          prompts: {},
           tools: {}
         })
       })
@@ -98,7 +97,7 @@ describe('MCP stdio transport integration', () => {
     expect(mockServerInstance.setRequestHandler).toHaveBeenCalled();
 
     const calls = mockServerInstance.setRequestHandler.mock.calls;
-    expect(calls.length).toBeGreaterThan(2); // At least prompts + tools handlers
+    expect(calls.length).toBe(2); // ListToolsRequestSchema and CallToolRequestSchema
   });
 
   test('should handle server initialization errors gracefully', async () => {

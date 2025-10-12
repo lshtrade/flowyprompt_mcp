@@ -1,6 +1,7 @@
 // Flow service for parsing and validating flow JSON
 // Uses flowSchema for JSON Schema validation
 
+import { log } from '../utils/logger.js';
 import { validateFlow } from '../models/flowSchema.js';
 
 /**
