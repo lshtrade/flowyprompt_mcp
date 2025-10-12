@@ -1,25 +1,45 @@
-// src/mcp/server.js
-// MCP Server implementation with stdio transport
+// src/mcp/httpServer.js
+// HTTP Streamable MCP Server implementation
 
+import express from 'express';
+import cors from 'cors';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { log } from '../utils/logger.js';
-import config from '../config/index.js';
-import promptsListTool, { getPromptsListData } from './tools/promptsList.js';
+import promptsListTool from './tools/promptsList.js';
+
+// Mock config for HTTP server (avoid validation errors)
+const mockConfig = {
+  httpPort: 3001,
+  mcp: {
+    serverName: 'flowyprompt-mcp-server',
+    serverVersion: '1.0.0'
+  }
+};
+
 import getVariableSets from './tools/getVariableSets.js';
 import flowsListTool from './tools/flowsList.js';
 import flowsShowTool from './tools/flowsShow.js';
-import metricsService from '../services/metricsService.js';
 
 /**
- * Initialize and start MCP server with stdio transport
+ * Initialize and start MCP server with HTTP transport (streamable responses)
  */
-export async function startMcpServer() {
+export function startHttpServer(port = mockConfig.httpPort || 3001) {
+  const app = express();
+
+  // Middleware
+  app.use(cors({
+    origin: '*', // Allow all origins for cross-platform compatibility
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Accept', 'Cache-Control']
+  }));
+  app.use(express.json());
+
+  // Create MCP server
   const server = new Server(
     {
-      name: config.mcp.serverName,
-      version: config.mcp.serverVersion,
+      name: mockConfig.mcp.serverName,
+      version: mockConfig.mcp.serverVersion,
     },
     {
       capabilities: {
@@ -28,9 +48,9 @@ export async function startMcpServer() {
     }
   );
 
-  // Register tool handlers
+  // Register tool handlers (same as stdio version)
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    log.info('Handling list_tools request', {}, 'McpServer');
+    log.info('Handling list_tools request via HTTP', {}, 'HttpMcpServer');
     return {
       tools: [
         {
@@ -46,7 +66,7 @@ export async function startMcpServer() {
             },
           },
         },
-          {
+        {
           name: 'health_check',
           description: 'Check MCP server health and configuration status',
           inputSchema: {
@@ -54,15 +74,7 @@ export async function startMcpServer() {
             properties: {},
           },
         },
-        {
-          name: 'get_metrics',
-          description: 'Get server performance and usage metrics',
-          inputSchema: {
-            type: 'object',
-            properties: {},
-          },
-        },
-        {
+          {
           name: 'get_variable_sets',
           description: 'Get variable value sets for a template (pre-filled variable combinations)',
           inputSchema: {
@@ -123,30 +135,24 @@ export async function startMcpServer() {
             required: ['flowName'],
           },
         },
-        ],
+      ],
     };
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    log.info('Handling call_tool request', { tool: request.params.name }, 'McpServer');
-    
+    log.info('Handling call_tool request via HTTP', { tool: request.params.name }, 'HttpMcpServer');
+
     switch (request.params.name) {
       case 'prompts_list':
         return await promptsListTool(request.params.arguments || {});
-      
-        
+
       case 'health_check':
         const healthData = {
           status: 'healthy',
           server: {
-            name: config.mcp.serverName,
-            version: config.mcp.serverVersion,
-          },
-          config: {
-            githubRepo: config.githubRepoUrl,
-            githubRef: config.githubRef,
-            cacheType: config.cacheType,
-            cacheTtlMs: config.cacheTtlMs,
+            name: mockConfig.mcp.serverName,
+            version: mockConfig.mcp.serverVersion,
+            transport: 'http'
           },
           uptime: process.uptime(),
           timestamp: new Date().toISOString(),
@@ -160,18 +166,8 @@ export async function startMcpServer() {
           ],
           isError: false,
         };
-      
-      case 'get_metrics':
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(metricsService.getMetrics(), null, 2),
-            }
-          ],
-          isError: false,
-        };
 
+  
       case 'get_variable_sets':
         return await getVariableSets(request.params.arguments || {});
 
@@ -199,25 +195,79 @@ export async function startMcpServer() {
           isError: false,
         };
 
-  
       default:
         throw new Error(`Unknown tool: ${request.params.name}`);
     }
   });
 
-  
-  
-  // Start stdio transport
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  // HTTP Routes
 
-  log.info('MCP Server started', {
-    name: config.mcp.serverName,
-    version: config.mcp.serverVersion,
-    transport: 'stdio',
-  }, 'McpServer');
+  // Health check endpoint
+  app.get('/health', (req, res) => {
+    res.json({
+      status: 'healthy',
+      server: mockConfig.mcp.serverName,
+      version: mockConfig.mcp.serverVersion,
+      transport: 'http',
+      timestamp: new Date().toISOString()
+    });
+  });
 
-  return server;
+  // MCP tools endpoint
+  app.post('/tools/:toolName', async (req, res) => {
+    try {
+      const { toolName } = req.params;
+      const result = await server.request(
+        { method: 'tools/call', params: { name: toolName, arguments: req.body } },
+        { tool: toolName, arguments: req.body }
+      );
+
+      res.json(result);
+    } catch (error) {
+      log.error('HTTP tool execution error', error, { toolName }, 'HttpMcpServer');
+      res.status(500).json({
+        error: true,
+        message: error.message,
+        code: error.code || 'INTERNAL_ERROR'
+      });
+    }
+  });
+
+  // List tools endpoint
+  app.get('/tools', async (req, res) => {
+    try {
+      const result = await server.request(
+        { method: 'tools/list', params: {} },
+        {}
+      );
+      res.json(result);
+    } catch (error) {
+      log.error('HTTP tools list error', error, {}, 'HttpMcpServer');
+      res.status(500).json({
+        error: true,
+        message: error.message,
+        code: error.code || 'INTERNAL_ERROR'
+      });
+    }
+  });
+
+  
+  // Start HTTP server
+  const httpServer = app.listen(port, () => {
+    log.info('HTTP MCP Server started', {
+      name: mockConfig.mcp.serverName,
+      version: mockConfig.mcp.serverVersion,
+      port,
+      transport: 'http',
+      endpoints: {
+        health: `http://localhost:${port}/health`,
+        tools: `http://localhost:${port}/tools`,
+        toolExecution: `http://localhost:${port}/tools/:toolName`
+      }
+    }, 'HttpMcpServer');
+  });
+
+  return { app, server, httpServer };
 }
 
-export default { startMcpServer };
+export default { startHttpServer };

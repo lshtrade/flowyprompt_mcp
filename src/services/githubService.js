@@ -106,6 +106,145 @@ class GitHubService {
   }
 
   /**
+   * List all flow files from GitHub repository
+   * @param {string} ref - Git reference (branch/tag/commit)
+   * @returns {Promise<Array>} Array of flow metadata {name, sha, size, download_url}
+   */
+  async listFlows(ref = 'main') {
+    const cacheKey = `flow-list:${ref}`;
+
+    // Request deduplication: Check if request is already in-flight
+    if (this.inFlightRequests.has(cacheKey)) {
+      log.info('Deduplicating in-flight list flows request', { cacheKey }, 'GitHubService');
+      return this.inFlightRequests.get(cacheKey);
+    }
+
+    // Create promise for this request
+    const requestPromise = this._listFlowsWithRetry(ref)
+      .finally(() => {
+        // Clean up in-flight cache when request completes
+        this.inFlightRequests.delete(cacheKey);
+      });
+
+    // Cache the in-flight promise
+    this.inFlightRequests.set(cacheKey, requestPromise);
+
+    return requestPromise;
+  }
+
+  /**
+   * Fetch flow content from GitHub repository
+   * @param {string} flowName - Flow name
+   * @param {string} ref - Git reference (branch/tag/commit)
+   * @returns {Promise<object>} Response with {content, etag}
+   */
+  async fetchFlow(flowName, ref = 'main') {
+    return this.fetchFile('flow', flowName, ref);
+  }
+
+  /**
+   * List flows with retry logic
+   * @private
+   */
+  async _listFlowsWithRetry(ref, attempt = 1) {
+    try {
+      return await this._listFlowsFromGitHub(ref);
+    } catch (error) {
+      // Don't retry on client errors (4xx) or rate limit errors
+      if (error.code === 'NOT_FOUND' || error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REQUEST' || error.code === 'RATE_LIMITED') {
+        throw error;
+      }
+
+      // Retry on network errors and server errors (5xx)
+      if (attempt < config.retryAttempts) {
+        const delay = this._calculateBackoff(attempt);
+        log.warn(`GitHub API error listing flows, retrying in ${delay}ms`, {
+          attempt,
+          maxAttempts: config.retryAttempts,
+          error: error.message,
+        }, 'GitHubService');
+
+        await this._sleep(delay);
+        return this._listFlowsWithRetry(ref, attempt + 1);
+      }
+
+      // Max retries exceeded
+      log.error('GitHub API max retries exceeded for list flows', error, { ref }, 'GitHubService');
+      throw createMcpError(
+        'GITHUB_ERROR',
+        `Failed to list flows from GitHub after ${config.retryAttempts} attempts: ${error.message}`,
+        'github'
+      );
+    }
+  }
+
+  /**
+   * List flows from GitHub API (metadata only)
+   * @private
+   */
+  async _listFlowsFromGitHub(ref) {
+    const repoPath = this._extractRepoPath(config.githubRepoUrl);
+    const url = `${this.baseUrl}/repos/${repoPath}/contents/flows?ref=${ref}`;
+
+    const headers = {
+      'Accept': 'application/vnd.github.v3+json',
+      'Authorization': `token ${config.githubPat}`,
+      'User-Agent': 'FlowyPrompt-MCP-Server',
+    };
+
+    log.info('Listing flows from GitHub', { url, ref }, 'GitHubService');
+
+    const startTime = Date.now();
+    const response = await fetch(url, { headers });
+    const latencyMs = Date.now() - startTime;
+
+    // Handle errors
+    if (!response.ok) {
+      // If flows directory doesn't exist, return empty array
+      if (response.status === 404) {
+        log.warn('Flows directory not found in repository', { 
+          ref, 
+          repoPath,
+          url,
+          status: response.status 
+        }, 'GitHubService');
+        return [];
+      }
+      return this._handleGitHubError(response, 'flows/');
+    }
+
+    // Parse response
+    const items = await response.json();
+
+    log.info('GitHub API response for flows directory', {
+      totalItems: items.length,
+      items: items.map(i => ({ name: i.name, type: i.type, size: i.size }))
+    }, 'GitHubService');
+
+    // Filter to .json files only
+    const jsonFiles = items.filter((item) => item.type === 'file' && item.name.endsWith('.json'));
+    
+    log.info('Filtered JSON files', {
+      jsonFileCount: jsonFiles.length,
+      jsonFiles: jsonFiles.map(f => f.name)
+    }, 'GitHubService');
+
+    const flows = jsonFiles.map((item) => ({
+      name: item.name.replace(/\.json$/, ''), // Remove .json extension
+      sha: item.sha,
+      size: item.size,
+      download_url: item.download_url,
+    }));
+
+    log.info('Successfully listed flows from GitHub', {
+      count: flows.length,
+      latencyMs,
+    }, 'GitHubService');
+
+    return flows;
+  }
+
+  /**
    * List templates from GitHub API
    * @private
    */

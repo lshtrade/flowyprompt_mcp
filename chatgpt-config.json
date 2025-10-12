@@ -1,0 +1,11 @@
+{
+  "name": "FlowyPrompt",
+  "description": "FlowyPrompt template and flow management",
+  "baseUrl": "http://localhost:3001",
+  "endpoints": {
+    "tools": "/tools",
+    "execute": "/tools/:toolName",
+    "health": "/health"
+  },
+  "authentication": "none"
+}
