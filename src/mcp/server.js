@@ -9,7 +9,6 @@ import config from '../config/index.js';
 import promptsListTool, { getPromptsListData } from './tools/promptsList.js';
 import getVariableSets from './tools/getVariableSets.js';
 import flowsListTool from './tools/flowsList.js';
-import flowsShowTool from './tools/flowsShow.js';
 import metricsService from '../services/metricsService.js';
 
 /**
@@ -101,28 +100,6 @@ export async function startMcpServer() {
             },
           },
         },
-        {
-          name: 'flows_show',
-          description: 'Show detailed information about a specific flow including nodes, edges, and execution order',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              flowName: {
-                type: 'string',
-                description: 'Flow name (without .json extension)',
-              },
-              ref: {
-                type: 'string',
-                description: 'Git reference (branch/tag/commit). Default: main',
-              },
-              includePositions: {
-                type: 'boolean',
-                description: 'Include node position coordinates. Default: false',
-              },
-            },
-            required: ['flowName'],
-          },
-        },
         ],
     };
   });
@@ -187,17 +164,6 @@ export async function startMcpServer() {
           isError: false,
         };
 
-      case 'flows_show':
-        const flowsShowResult = await flowsShowTool(request.params.arguments || {});
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(flowsShowResult, null, 2),
-            }
-          ],
-          isError: false,
-        };
 
   
       default:
