@@ -64,7 +64,7 @@ describe('MCP Tool: prompts/get', () => {
     const mockTemplate = {
       metadata: {
         name: 'Brand_Positioning_Strategy',
-        description: '브랜드 포지셔닝 전략 수립',
+        description: 'Develop comprehensive brand positioning strategy',
         version: '1.0.0',
         tags: ['marketing']
       },
@@ -84,14 +84,14 @@ describe('MCP Tool: prompts/get', () => {
     const result = await promptsGetTool({
       name: 'Brand_Positioning_Strategy',
       variables: {
-        company_name: '테크스타트업',
+        company_name: 'TechStartup Inc',
         industry: 'AI'
       }
     });
 
     // Verify response structure
     expect(result.description).toBe('Brand_Positioning_Strategy');
-    expect(result.content).toContain('테크스타트업');
+    expect(result.content).toContain('TechStartup Inc');
     expect(result.content).toContain('AI');
     expect(result.isError).toBe(false);
 
