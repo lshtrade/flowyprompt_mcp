@@ -9,7 +9,9 @@ import config from '../config/index.js';
 import promptsListTool, { getPromptsListData } from './tools/promptsList.js';
 import getVariableSets from './tools/getVariableSets.js';
 import flowsListTool from './tools/flowsList.js';
+import flowsShowTool from './tools/flowsShow.js';
 import metricsService from '../services/metricsService.js';
+import promptTemplateShowTool from './tools/promptTemplateShow.js';
 
 /**
  * Initialize and start MCP server with stdio transport
@@ -43,6 +45,28 @@ export async function startMcpServer() {
                 description: 'Git reference (branch/tag/commit). Default: main',
               },
             },
+          },
+        },
+        {
+          name: 'prompt_template_show',
+          description: 'Show simplified template info (title, template, variables) for a given template JSON',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              name: {
+                type: 'string',
+                description: 'Template name (without .json extension)'
+              },
+              ref: {
+                type: 'string',
+                description: 'Git reference (branch/tag/commit). Default: main',
+              },
+              variables: {
+                type: 'string',
+                description: 'Set to "true" to include title and variables fields, otherwise only template is returned',
+              },
+            },
+            required: ['name'],
           },
         },
           {
@@ -100,6 +124,28 @@ export async function startMcpServer() {
             },
           },
         },
+        {
+          name: 'flows_show',
+          description: 'Show detailed information about a specific flow including nodes, edges, and execution order',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              flowName: {
+                type: 'string',
+                description: 'Flow name (without .json extension)',
+              },
+              ref: {
+                type: 'string',
+                description: 'Git reference (branch/tag/commit). Default: main',
+              },
+              includePositions: {
+                type: 'boolean',
+                description: 'Include node position coordinates. Default: false',
+              },
+            },
+            required: ['flowName'],
+          },
+        },
         ],
     };
   });
@@ -110,6 +156,9 @@ export async function startMcpServer() {
     switch (request.params.name) {
       case 'prompts_list':
         return await promptsListTool(request.params.arguments || {});
+      case 'prompt_template_show':
+        return await promptTemplateShowTool(request.params.arguments || {});
+
       
         
       case 'health_check':
@@ -164,6 +213,17 @@ export async function startMcpServer() {
           isError: false,
         };
 
+      case 'flows_show':
+        const flowsShowResult = await flowsShowTool(request.params.arguments || {});
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(flowsShowResult, null, 2),
+            }
+          ],
+          isError: false,
+        };
 
   
       default:
