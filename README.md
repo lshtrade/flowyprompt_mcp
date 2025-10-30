@@ -99,7 +99,33 @@ Add the MCP server to your Claude Desktop configuration file:
 - ✅ No `.env` file needed in the project directory
 - ⚠️ Use absolute paths for `args` (e.g., `/Users/name/flowyprompt_mcp/index.js`)
 - ⚠️ `GITHUB_PAT` and `GITHUB_REPO_URL` are required
-- 💡 Example config file: See [`claude_desktop_config.example.json`](./claude_desktop_config.example.json) in the repository
+- 💡 Example config file: See [`mcp_config.example.json`](./mcp_config.example.json) in the repository
+
+### Claude Code Configuration (VS Code)
+
+Use the same configuration format as Claude Desktop. If Claude Code supports file references, you can include the same file directly using:
+
+```json
+"@mcp_config.example.json"
+```
+
+### JSON-based MCP Clients (e.g., Gemini)
+
+Use the same configuration. If your client supports `@file` includes, reference the shared example config:
+
+```json
+"@mcp_config.example.json"
+```
+
+#### "@file" include format
+
+Some clients support referencing an external JSON file by using a string that begins with `@`. You can reuse an existing config with:
+
+```json
+"@mcp_config.example.json"
+```
+
+This keeps a single source of truth across clients.
 
 ### Verify Installation
 
